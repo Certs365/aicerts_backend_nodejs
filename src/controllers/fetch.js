@@ -1147,38 +1147,38 @@ const fetchIssuesLogDetails = async (req, res) => {
           break;
         case 6:
           var filteredResponse6 = [];
-          var query1Promise = await Issues.find({
+         
+          const commonFilter = {
             issuerId: issuerExist.issuerId,
             certificateStatus: { $in: [1, 2, 4] },
-            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-          }).lean(); // Use lean() to convert documents to plain JavaScript objects
+            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket }
+          };
 
-          var query2Promise = await BatchIssues.find({
-            issuerId: issuerExist.issuerId,
-            certificateStatus: { $in: [1, 2, 4] },
-            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-          }).lean(); // Use lean() to convert documents to plain JavaScript objects
+          // Fetch all issues across different models
+          const [issues, batchIssues, dynamicIssues, dynamicBatchIssues] = await Promise.all([
+            Issues.find(commonFilter, { issueDate: 1, certificateNumber: 1, expirationDate: 1, name: 1 }).lean(),
+            BatchIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, expirationDate: 1, name: 1 }).lean(),
+            DynamicIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, name: 1 }).lean(),
+            DynamicBatchIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, name: 1 }).lean()
+          ]);
 
-          var query3Promise = await DynamicIssues.find({
-            issuerId: issuerExist.issuerId,
-            certificateStatus: { $in: [1, 2, 4] },
-            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-          }).lean(); // Use lean() to convert documents to plain JavaScript objects
+          // Organize issues based on their source
+          const result = {
+            issues,
+            batchIssues,
+            dynamicIssues,
+            dynamicBatchIssues,
+          };
 
-          var query4Promise = await DynamicBatchIssues.find({
-            issuerId: issuerExist.issuerId,
-            certificateStatus: { $in: [1, 2, 4] },
-            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-          }).lean(); // Use lean() to convert documents to plain JavaScript objects
-
-          // Wait for both queries to resolve
-          var [queryResponse1, queryResponse2, queryResponse3, queryResponse4] = await Promise.all([query1Promise, query2Promise, query3Promise, query4Promise]);
+          var queryResponse1 = result.issues;
+          var queryResponse2 = result.batchIssues;
+          var queryResponse3 = result.dynamicIssues;
+          var queryResponse4 = result.dynamicBatchIssues;
 
           // Merge the results into a single array
           var _queryResponse = [...queryResponse1, ...queryResponse2, ...queryResponse3, ...queryResponse4];
           // Sort the data based on the 'issueDate' date in descending order
           _queryResponse.sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate));
-
           for (var item6 of _queryResponse) {
             var certificateNumber = item6.certificateNumber;
             const issueStatus6 = await IssueStatus.findOne({ certificateNumber });
@@ -1196,32 +1196,33 @@ const fetchIssuesLogDetails = async (req, res) => {
           queryResponse = filteredResponse6;
           break;
         case 7://To fetch Revoked certifications and count
-          var query1Promise = await Issues.find({
+     
+          const commonFilterRevoke = {
             issuerId: issuerExist.issuerId,
-            certificateStatus: 3,
-            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-          }).lean(); // Use lean() to convert documents to plain JavaScript objects
+            certificateStatus: { $in: [3] },
+            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket }
+          };
 
-          var query2Promise = await BatchIssues.find({
-            issuerId: issuerExist.issuerId,
-            certificateStatus: 3,
-            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-          }).lean(); // Use lean() to convert documents to plain JavaScript objects
+          // Fetch all issues across different models
+          const [issuesRevoke, batchIssuesRevoke, dynamicIssuesRevoke, dynamicBatchIssuesRevoke] = await Promise.all([
+            Issues.find(commonFilterRevoke, { issueDate: 1, certificateNumber: 1, expirationDate: 1, name: 1 }).lean(),
+            BatchIssues.find(commonFilterRevoke, { issueDate: 1, certificateNumber: 1, expirationDate: 1, name: 1 }).lean(),
+            DynamicIssues.find(commonFilterRevoke, { issueDate: 1, certificateNumber: 1, name: 1 }).lean(),
+            DynamicBatchIssues.find(commonFilterRevoke, { issueDate: 1, certificateNumber: 1, name: 1 }).lean()
+          ]);
 
-          var query3Promise = await DynamicIssues.find({
-            issuerId: issuerExist.issuerId,
-            certificateStatus: 3,
-            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-          }).lean(); // Use lean() to convert documents to plain JavaScript objects
+          // Organize issues based on their source
+          const resultRevoke = {
+            issuesRevoke,
+            batchIssuesRevoke,
+            dynamicIssuesRevoke,
+            dynamicBatchIssuesRevoke,
+          };
 
-          var query4Promise = await DynamicBatchIssues.find({
-            issuerId: issuerExist.issuerId,
-            certificateStatus: 3,
-            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-          }).lean(); // Use lean() to convert documents to plain JavaScript objects
-
-          // Wait for both queries to resolve
-          var [queryResponse1, queryResponse2, queryResponse3, queryResponse4] = await Promise.all([query1Promise, query2Promise, query3Promise, query4Promise]);
+          var queryResponse1 = resultRevoke.issuesRevoke;
+          var queryResponse2 = resultRevoke.dynamicIssuesRevoke;
+          var queryResponse3 = resultRevoke.dynamicIssuesRevoke;
+          var queryResponse4 = resultRevoke.dynamicBatchIssuesRevoke;
 
           // Merge the results into a single array
           var _queryResponse = [...queryResponse1, ...queryResponse2, ...queryResponse3, ...queryResponse4];
@@ -1233,22 +1234,28 @@ const fetchIssuesLogDetails = async (req, res) => {
           break;
         case 8:
           var filteredResponse8 = [];
-          var query1Promise = await Issues.find({
+
+          const commonFilterReactivate = {
             issuerId: issuerExist.issuerId,
             certificateStatus: { $in: [1, 2, 4] },
             expirationDate: { $ne: "1" },
-            url: { $exists: true, $ne: null, $ne: "", $regex: bucketName } // Filter to include documents where `url` exists
-          }).lean(); // Use lean() to convert documents to plain JavaScript objects
+            url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket }
+          };
 
-          var query2Promise = await BatchIssues.find({
-            issuerId: issuerExist.issuerId,
-            certificateStatus: { $in: [1, 2, 4] },
-            expirationDate: { $ne: "1" },
-            url: { $exists: true, $ne: null, $ne: "", $regex: bucketName } // Filter to include documents where `url` exists
-          }).lean(); // Use lean() to convert documents to plain JavaScript objects
+          // Fetch all issues across different models
+          const [issuesReactivate, batchIssuesReactivate] = await Promise.all([
+            Issues.find(commonFilterReactivate, { issueDate: 1, certificateNumber: 1, expirationDate: 1, name: 1 }).lean(),
+            BatchIssues.find(commonFilterReactivate, { issueDate: 1, certificateNumber: 1, expirationDate: 1, name: 1 }).lean(),
+           ]);
 
-          // Wait for both queries to resolve
-          var [queryResponse1, queryResponse2] = await Promise.all([query1Promise, query2Promise]);
+           // Organize issues based on their source
+          const resultReactivate = {
+            issuesReactivate,
+            batchIssuesReactivate
+          };
+
+          var queryResponse1 = resultReactivate.issuesReactivate;
+          var queryResponse2 = resultReactivate.batchIssuesReactivate;
 
           // Merge the results into a single array
           var queryResponse = [...queryResponse1, ...queryResponse2];
@@ -1354,17 +1361,21 @@ const fetchGraphDetails = async (req, res) => {
   }
 
   try {
-    var fetchAnnualSingleIssues = await IssueStatus.find({
-      email: issuerExist.email,
-      certStatus: 1,
-      batchId: null
-    }).lean();
+    // Fetch all certificates with the specified email and certStatus in one call
+    const certificates = await IssueStatus.find(
+      { email: issuerExist.email, certStatus: 1 },
+      { lastUpdate: 1, certStatus: 1, /* other necessary fields */ }
+    ).lean();
 
-    var fetchAnnualBatchIssues = await IssueStatus.find({
-      email: issuerExist.email,
-      certStatus: 1,
-      batchId: { $ne: null }
-    }).lean();
+    // Organize certificates based on their certStatus
+    const result = {
+      single: certificates.filter(cert => cert.certStatus === 1 && cert.batchId === null),
+      batch: certificates.filter(cert => cert.certStatus === 1 && cert.batchId !== null)
+      // Add any other statuses as needed
+    };
+
+    var fetchAnnualSingleIssues = result.single;
+    var fetchAnnualBatchIssues = result.batch;
 
     var getSingleIssueDetailsMonthCount = await getAggregatedCertsDetails(fetchAnnualSingleIssues, year);
     var getBatchIssueDetailsMonthCount = await getAggregatedCertsDetails(fetchAnnualBatchIssues, year);
@@ -1459,25 +1470,24 @@ const fetchGraphStatusDetails = async (req, res) => {
   }
 
   try {
-    var fetchAllCertificateIssues = await IssueStatus.find({
-      email: issuerExist.email,
-      certStatus: 1
-    }).lean();
+    // Fetch all certificates with the specified email and certStatus in one call
+    const certificates = await IssueStatus.find(
+      { email: issuerExist.email, certStatus: { $in: [1, 2, 3, 4] } },
+      { lastUpdate: 1, certStatus: 1, /* other necessary fields */ }
+    ).lean();
 
-    var fetchAllCertificateRenewes = await IssueStatus.find({
-      email: issuerExist.email,
-      certStatus: 2
-    }).lean();
+    // Organize certificates based on their certStatus
+    const result = {
+      issued: certificates.filter(cert => cert.certStatus === 1),
+      renewed: certificates.filter(cert => cert.certStatus === 2),
+      revoked: certificates.filter(cert => cert.certStatus === 3),
+      reactivated: certificates.filter(cert => cert.certStatus === 4),
+    };
 
-    var fetchAllCertificateRevoked = await IssueStatus.find({
-      email: issuerExist.email,
-      certStatus: 3
-    }).lean();
-
-    var fetchAllCertificateReactivated = await IssueStatus.find({
-      email: issuerExist.email,
-      certStatus: 4
-    }).lean();
+    var fetchAllCertificateIssues = result.issued;
+    var fetchAllCertificateRenewes = result.renewed;
+    var fetchAllCertificateRevoked = result.revoked;
+    var fetchAllCertificateReactivated = result.reactivated;
     // console.log("All status responses", fetchAllCertificateIssues.length, fetchAllCertificateRenewes.length, fetchAllCertificateRevoked.length, fetchAllCertificateReactivated.length);
 
     if (value > 2000 && value < 2199) {
@@ -1503,7 +1513,6 @@ const fetchGraphStatusDetails = async (req, res) => {
       });
       return;
     } else if (value >= 1 && value <= 12) {
-
       var getIssueDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateIssues, value, today.getFullYear());
       var getRenewDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateRenewes, value, today.getFullYear());
       var getRevokedDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateRevoked, value, today.getFullYear());
@@ -1534,41 +1543,30 @@ const fetchGraphStatusDetails = async (req, res) => {
 
 const getMonthAggregatedCertsDetails = async (data, month, year) => {
 
-  // Function to extract month and year from lastUpdate field
-  const getMonthYear = (entry) => {
-    const date = moment(entry.lastUpdate);
-    const year = date.year();
-    return year;
-  };
-
-  // Function to get formatted month with leading zero if needed
-  const getFormattedMonth = (month) => {
-    return month < 10 ? "0" + month : month.toString();
-  };
-
-  // Filter data for the specified month and year
-  const dataMonthYear = data.filter(entry => {
-    const entryYear = getMonthYear(entry);
-    const entryMonth = moment(entry.lastUpdate).month() + 1;
-    return entryYear === year && entryMonth === month;
-  });
-
-  // Count occurrences of each day in the month
+  // Create a map to count occurrences for each day
   const daysCounts = {};
-  dataMonthYear.forEach(entry => {
-    const day = moment(entry.lastUpdate).date();
-    daysCounts[day] = (daysCounts[day] || 0) + 1;
+
+  // Loop through each entry in the data
+  data.forEach(entry => {
+    const lastUpdate = moment(entry.lastUpdate);
+    const entryYear = lastUpdate.year();
+    const entryMonth = lastUpdate.month() + 1; // month is 0-indexed in moment
+
+    // Filter by year and month
+    if (entryYear === year && entryMonth === month) {
+      const day = lastUpdate.date();
+      daysCounts[day] = (daysCounts[day] || 0) + 1;
+    }
   });
 
-  // Create array with counts for all days in the specified month and year
+  // Create an array with counts for all days in the specified month and year
   const daysCountsArray = [];
-  const daysInMonth = moment(`${year}-${getFormattedMonth(month)}`, "YYYY-MM").daysInMonth();
+  const daysInMonth = moment(`${year}-${month < 10 ? "0" : ""}${month}`, "YYYY-MM").daysInMonth();
   for (let i = 1; i <= daysInMonth; i++) {
     daysCountsArray.push({ day: i, count: daysCounts[i] || 0 });
   }
 
   return daysCountsArray;
-
 };
 
 /**
@@ -1592,28 +1590,24 @@ const fetchStatusCoreFeatureIssues = async (req, res) => {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgUserEmailNotFound, details: email });
     }
 
-    var fetchAllIssues = await IssueStatus.find({
-      email: issuerExist.email,
-      certStatus: 1
-    }).lean();
+    const certificates = await IssueStatus.find(
+      { email: issuerExist.email, certStatus: { $in: [1, 2, 3, 4] } },
+      { lastUpdate: 1, certStatus: 1, /* other necessary fields */ }
+    ).lean();
 
-    var fetchAllRenews = await IssueStatus.find({
-      email: issuerExist.email,
-      certStatus: 2
-    }).lean();
+    // Organize certificates based on their certStatus
+    const result = {
+      issued: certificates.filter(cert => cert.certStatus === 1),
+      renewed: certificates.filter(cert => cert.certStatus === 2),
+      revoked: certificates.filter(cert => cert.certStatus === 3),
+      reactivated: certificates.filter(cert => cert.certStatus === 4),
+    };
 
-    var fetchAllRevokes = await IssueStatus.find({
-      email: issuerExist.email,
-      certStatus: 3
-    }).lean();
-
-    var fetchAllReactivates = await IssueStatus.find({
-      email: issuerExist.email,
-      certStatus: 4
-    }).lean();
-
-    // Wait for both queries to resolve
-    var [queryIssues, queryRenews, queryRevokes, queryReactivates] = await Promise.all([fetchAllIssues, fetchAllRenews, fetchAllRevokes, fetchAllReactivates]);
+    var queryIssues = result.issued;
+    var queryRenews = result.renewed;
+    var queryRevokes = result.revoked;
+    var queryReactivates = result.reactivated;
+    // console.log("The response count", queryIssues.length, queryRenews.length, queryRevokes.length, queryReactivates.length);
 
     if (queryIssues.length == 0 && queryRenews.length == 0 && queryRevokes.length == 0 && queryReactivates.length == 0) {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgNoMatchFound });
@@ -1795,7 +1789,7 @@ const getSingleCertificates = async (req, res) => {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuerId });
     }
 
-    const isIdExist = await User.findOne({ issuerId : issuerId });
+    const isIdExist = await User.findOne({ issuerId: issuerId });
 
     // Check if the target address is a valid Ethereum address
     if (!ethers.isAddress(issuerId) || !isIdExist) {
@@ -1829,7 +1823,7 @@ const getSingleCertificates = async (req, res) => {
 
     const certificates = [...certificatesSimple, ...certificatesDynamic];
 
-    if(certificates.length < 1){
+    if (certificates.length < 1) {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgNoMatchFound });
     }
 
@@ -1865,7 +1859,7 @@ const getBatchCertificateDates = async (req, res) => {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuerId });
     }
 
-    const isIdExist = await User.findOne({ issuerId : issuerId });
+    const isIdExist = await User.findOne({ issuerId: issuerId });
 
     // Check if the target address is a valid Ethereum address
     if (!isIdExist) {
@@ -1878,10 +1872,10 @@ const getBatchCertificateDates = async (req, res) => {
 
     const batchCertificates = [...batchCertificatesOne, ...batchCertificatesTwo];
 
-    if(batchCertificates.length < 1){
+    if (batchCertificates.length < 1) {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgNoMatchFound });
     }
-    
+
     // Create a map to store the first certificate's issueDate for each batchId
     const batchDateMap = new Map();
 
@@ -1931,7 +1925,7 @@ const getBatchCertificates = async (req, res) => {
       return res.status(400).json({ code: 400, status: "FAILED", message: "Please provide valid batchId and issuerId" });
     }
 
-    const isIdExist = await User.findOne({ issuerId : issuerId });
+    const isIdExist = await User.findOne({ issuerId: issuerId });
 
     // Check if the target address is a valid Ethereum address
     if (!isIdExist) {
@@ -1944,7 +1938,7 @@ const getBatchCertificates = async (req, res) => {
       certificates = await DynamicBatchIssues.find({ batchId, issuerId });
     }
 
-    if(certificates.length < 1){
+    if (certificates.length < 1) {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgNoMatchFound });
     }
 
@@ -2129,7 +2123,7 @@ const fetchCustomIssuedCertificates = async (req, res) => {
       certStatus: 6
     });
 
-    if(getIssuances){
+    if (getIssuances) {
       totalCount.push(getIssuances.length);
     }
 
@@ -2177,7 +2171,7 @@ const fetchCustomIssuedCertificates = async (req, res) => {
         sumOfIssuances[key] = [issuanceResponses[key]];
       }
     }
-    
+
     // console.log("The response", issuanceResponses);
     // console.log("Total count", issuesCount, sumOfIssuances);
 
