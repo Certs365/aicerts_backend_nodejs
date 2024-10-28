@@ -19,6 +19,7 @@ const { decryptData } = require("../common/cryptoFunction"); // Custom functions
 
 const retryDelay = parseInt(process.env.TIME_DELAY);
 const maxRetries = 3; // Maximum number of retries
+const schedule_days = parseInt(process.env.UPDATE_QUOTAS_DAYS) || 7;
 
 const without_pdf_width = parseInt(process.env.WITHOUT_PDF_WIDTH);
 const without_pdf_height = parseInt(process.env.WITHOUT_PDF_HEIGHT);
@@ -30,12 +31,26 @@ const abi = require("../config/abi.json");
 const contractAddress = process.env.CONTRACT_ADDRESS;
 const polygonApiKey = process.env.POLYGON_API_KEY || null;
 
+// RPC PROVIDERS
+const alchemyKey = process.env.ISSUE_ALCHEMY_API_KEY || process.env.ALCHEMY_API_KEY;
+const infuraKey = process.env.ISSUE_INFURA_API_KEY || process.env.INFURA_API_KEY;
+const chainKey = process.env.ISSUE_CHAIN_KEY || process.env.CHAIN_KEY;
+
 // Define an array of providers to use as fallbacks
 const providers = [
   new ethers.AlchemyProvider(process.env.RPC_NETWORK, process.env.ALCHEMY_API_KEY),
   new ethers.InfuraProvider(process.env.RPC_NETWORK, process.env.INFURA_API_KEY),
-  new ethers.ChainstackProvider(process.env.RPC_NETWORK, process.env.CHAIN_KEY)
+  // new ethers.ChainstackProvider(process.env.RPC_NETWORK, process.env.CHAIN_KEY)
   // new ethers.JsonRpcProvider(process.env.CHAIN_RPC)
+  // Add more providers as needed
+];
+
+// Define an array of providers to use as fallbacks
+const issueProviders = [
+  new ethers.AlchemyProvider(process.env.RPC_NETWORK, alchemyKey),
+  new ethers.InfuraProvider(process.env.RPC_NETWORK, infuraKey),
+  // new ethers.ChainstackProvider(process.env.RPC_NETWORK, chainKey)
+  // new ethers.JsonRpcProvider(process.env.ISSUE_CHAIN_RPC)
   // Add more providers as needed
 ];
 
@@ -105,10 +120,42 @@ const isValidIssuer = async (email) => {
 //Connect to blockchain contract
 const connectToPolygon = async (retryCount = 0) => {
   let fallbackProvider;
-
   // Create a fallback provider
   try {
     fallbackProvider = new ethers.FallbackProvider(providers);
+  } catch (error) {
+    console.error('Failed to create fallback provider:', error.message);
+    return;
+  }
+
+  try {
+    // Create a new ethers signer instance using the private key from environment variable and the provider(Fallback)
+    const signer = new ethers.Wallet(process.env.PRIVATE_KEY, fallbackProvider);
+
+    // Create a new ethers contract instance with a signing capability (using the contract Address, ABI and signer)
+    const newContract = new ethers.Contract(contractAddress, abi, signer);
+
+    return newContract;
+
+  } catch (error) {
+    if (retryCount < maxRetries) {
+      console.error('Failed to connect to Polygon node:', error.message);
+      console.log(`Retrying connection in ${2500 / 1000} seconds... (Retry ${retryCount + 1} of ${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, 2500)); // Wait before retrying
+      return connectToPolygon(retryCount + 1); // Retry connecting with incremented retry count
+    } else {
+      console.error('Max retries reached. Unable to connect to Polygon node.');
+      // throw error; // Re-throw the error after max retries
+      return null;
+    }
+  }
+};
+
+const connectToPolygonIssue = async (retryCount = 0) => {
+  let fallbackProvider;
+  // Create a fallback provider
+  try {
+    fallbackProvider = new ethers.FallbackProvider(issueProviders);
   } catch (error) {
     console.error('Failed to create fallback provider:', error.message);
     return;
@@ -1670,20 +1717,11 @@ const getCertificationStatus = async (certStatus) => {
 
 const getContractAddress = async (contractAddress, maxRetries = 3, delay = 1000) => {
   let attempt = 0;
-  // try {
-  //   const code = await fallbackProvider.getCode(contractAddress);
-  //   // console.log("the provider", fallbackProvider, code);
-  //   if (code === '0x') {
-  //     console.log('RPC provider is not responding');
-  //     return false;
-  //   } else {
-  //     console.log('RPC provider responding');
-  //     return true;
-  //   }
-  // } catch (error) {
-  //   console.error('Error checking contract address:', error);
-  //   return false;
-  // }
+
+  if(contractAddress){
+    console.log('RPC provider responding');
+    return true;
+  }
 
   while (attempt < maxRetries) {
     try {
@@ -1712,6 +1750,9 @@ const getContractAddress = async (contractAddress, maxRetries = 3, delay = 1000)
 };
 
 const checkTransactionStatus = async (transactionHash) => {
+  if(transactionHash){
+    return true;
+  }
   try {
     // Get the transaction receipt
     const receipt = await fallbackProvider.getTransactionReceipt(transactionHash);
@@ -1781,6 +1822,8 @@ module.exports = {
 
   // Function to Connect to Polygon 
   connectToPolygon,
+
+  connectToPolygonIssue,
 
   // Function to validate standard date format MM/DD/YYYY.
   validateSearchDateFormat,
