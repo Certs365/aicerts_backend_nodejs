@@ -1403,14 +1403,13 @@ const fetchGraphDetails = async (req, res) => {
     // Fetch all certificates with the specified email and certStatus in one call
     const certificates = await IssueStatus.find(
       { email: issuerExist.email, certStatus: 1 },
-      { lastUpdate: 1, certStatus: 1, /* other necessary fields */ }
+      { lastUpdate: 1, certStatus: 1, batchId: 1 /* other necessary fields */ }
     ).lean();
 
     // Organize certificates based on their certStatus
     const result = {
-      single: certificates.filter(cert => cert.certStatus === 1 && cert.batchId === null),
-      batch: certificates.filter(cert => cert.certStatus === 1 && cert.batchId !== null)
-      // Add any other statuses as needed
+      single: certificates.filter(cert => cert.batchId == null),
+      batch: certificates.filter(cert => cert.batchId !== null)
     };
 
     var fetchAnnualSingleIssues = result.single;
