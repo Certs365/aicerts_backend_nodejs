@@ -1220,7 +1220,7 @@ const fetchIssuesLogDetails = async (req, res) => {
           };
 
           var queryResponse1 = resultRevoke.issuesRevoke;
-          var queryResponse2 = resultRevoke.dynamicIssuesRevoke;
+          var queryResponse2 = resultRevoke.batchIssuesRevoke;
           var queryResponse3 = resultRevoke.dynamicIssuesRevoke;
           var queryResponse4 = resultRevoke.dynamicBatchIssuesRevoke;
 
