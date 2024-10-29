@@ -44,6 +44,7 @@ module.exports = {
     msgUnableToFindFiles: "Unable to find valid files in the uploaded zip.",
     msgUnableToFindPdfFiles: "Unable to find Credential pdf files.",
     msgUnableToFindExcelFiles: "Unable to find Excel file in the upload.",
+    msgFindMoreExcelFiles: "Unable to handle multiple Excel files in the upload.",
     msgAbleToFindFiles: "Able to find files.",
     msgInputRecordsNotMatched: "Bulk input Credentials (pdf) are not matched with Excel records",
     msgFailedToIssueBulkCerts: "Failed to issue Bulk credentials, Please try again",

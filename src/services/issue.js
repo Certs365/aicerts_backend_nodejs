@@ -53,6 +53,7 @@ const {
   getContractAddress,
   getPdfDimensions,
   wipeUploadFolder,
+  wipeSourceFolder,
 } = require("../model/tasks"); // Importing functions from the '../model/tasks' module
 // import bull queue
 const Queue = require("bull");
@@ -290,10 +291,10 @@ const handleIssueCertification = async (
             let moreDetails =
               val[0] === true
                 ? {
-                    certificateNumber: certificateNumber,
-                    expirationDate: modifiedDate,
-                    certificateStatus: _certificateStatus,
-                  }
+                  certificateNumber: certificateNumber,
+                  expirationDate: modifiedDate,
+                  certificateStatus: _certificateStatus,
+                }
                 : "";
             if (isPaused === true) {
               messageContent = messageCode.msgOpsRestricted;
@@ -1033,10 +1034,10 @@ const handleIssuePdfCertification = async (
           let moreDetails =
             val[0] === true
               ? {
-                  certificateNumber: certificateNumber,
-                  expirationDate: modifiedDate,
-                  certificateStatus: _certificateStatus,
-                }
+                certificateNumber: certificateNumber,
+                expirationDate: modifiedDate,
+                certificateStatus: _certificateStatus,
+              }
               : "";
 
           if (isPaused === true) {
@@ -1411,10 +1412,10 @@ const handleIssueDynamicPdfCertification = async (
           let moreDetails =
             val[0] === true
               ? {
-                  certificateNumber: certificateNumber,
-                  expirationDate: modifiedDate,
-                  certificateStatus: _certificateStatus,
-                }
+                certificateNumber: certificateNumber,
+                expirationDate: modifiedDate,
+                certificateStatus: _certificateStatus,
+              }
               : "";
 
           if (isPaused === true) {
@@ -1823,10 +1824,10 @@ const handleIssueDynamicCertification = async (
           let moreDetails =
             val[0] === true
               ? {
-                  certificateNumber: certificateNumber,
-                  expirationDate: modifiedDate,
-                  certificateStatus: _certificateStatus,
-                }
+                certificateNumber: certificateNumber,
+                expirationDate: modifiedDate,
+                certificateStatus: _certificateStatus,
+              }
               : "";
 
           if (isPaused === true) {
@@ -2055,6 +2056,358 @@ const handleIssueDynamicCertification = async (
 };
 
 const dynamicBulkCertificates = async (
+  email,
+  issuerId,
+  _pdfReponse,
+  _excelResponse,
+  excelFilePath,
+  posx,
+  posy,
+  qrside,
+  pdfWidth,
+  pdfHeight,
+  qrOption,
+  customFolder,
+  flag
+) => {
+  const newContract = await connectToPolygon();
+  if (!newContract) {
+    return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+  }
+  // console.log("Batch inputs", _pdfReponse, excelFilePath);
+  const pdfResponse = _pdfReponse;
+  const excelResponse = _excelResponse[0];
+  var insertPromises = []; // Array to hold all insert promises
+  var insertUrl = [];
+  var modifiedUrl;
+  var imageUrl;
+  var customFields;
+
+  if (!pdfResponse || pdfResponse.length == 0) {
+    return {
+      code: 400,
+      status: false,
+      message: messageCode.msgUnableToFindPdfFiles,
+    };
+  }
+
+  try {
+    // Check if the directory exists, if not, create it
+    const destDirectory = path.join(__dirname, "../../uploads", customFolder, "completed");
+    console.log("Present working directory", __dirname, destDirectory);
+
+    if (bulkIssueStatus == "ZIP_STORE" || flag == 1) {
+      if (fs.existsSync(destDirectory)) {
+        // Delete the existing directory recursively
+        fs.rmSync(destDirectory, { recursive: true });
+      }
+      // Recreate the directory
+      fs.mkdirSync(destDirectory, { recursive: true });
+      const excelFileName = path.basename(excelFilePath);
+      // Destination file path
+      const destinationFilePath = path.join(destDirectory, excelFileName);
+      // Read the content of the source file
+      const fileContent = fs.readFileSync(excelFilePath);
+      // Write the content to the destination file
+      fs.writeFileSync(destinationFilePath, fileContent);
+    }
+
+    var transformedResponse = _excelResponse[2];
+
+    // return ({ code: 400, status: false, message: messageCode.msgUnderConstruction, Details: `${transformedResponse}, ${pdfResponse}` });
+
+    // Hash each row of data
+    const hashedBatchData = transformedResponse.map((data) => {
+      // Convert each item to a string, handling null values
+      const dataString = data
+        .map((item) => (item === null ? "null" : item.toString()))
+        .join("");
+      const _hash = calculateHash(dataString);
+      return _hash;
+    });
+
+    // Format as arrays with corresponding elements using a loop
+    values = hashedBatchData.map((hash) => [hash]);
+
+    // await cleanUploadFolder();
+    // return ({ code: 400, status: false, message: messageCode.msgUnderConstruction, Details: `${values}` });
+    try {
+      // Generate the Merkle tree
+      let tree = StandardMerkleTree.of(values, ["string"]);
+      let batchExpiration = 1;
+
+      let getContractStatus = await getContractAddress(contractAddress);
+      if (!getContractStatus) {
+        return {
+          code: 400,
+          status: "FAILED",
+          message: messageCode.msgFailedAtBlockchain,
+          details: messageCode.msgRpcFailed,
+        };
+      }
+
+      var batchNumber = await newContract.getRootLength();
+      var allocateBatchId = parseInt(batchNumber) + 1;
+
+      var { txHash, txFee } = await issueBatchCertificateWithRetry(
+        tree.root,
+        batchExpiration
+      );
+      if (!txHash) {
+        return {
+          code: 400,
+          status: false,
+          message: messageCode.msgFaileToIssueAfterRetry,
+        };
+      }
+
+      var linkUrl = `https://${process.env.NETWORK}/tx/${txHash}`;
+
+      if (pdfResponse.length == _excelResponse[1]) {
+        console.log("working directory", __dirname);
+
+        for (let i = 0; i < pdfResponse.length; i++) {
+          var pdfFileName = pdfResponse[i];
+          var pdfFilePath = path.join(__dirname, "../../uploads", customFolder, pdfFileName);
+          console.log("pdf directory path", pdfFilePath);
+
+          // Extract Certs from pdfFileName
+          const certs = pdfFileName.split(".")[0]; // Remove file extension
+          const foundEntry = await excelResponse.find(
+            (entry) => entry.documentName === certs
+          );
+          if (foundEntry) {
+            var index = excelResponse.indexOf(foundEntry);
+            var _proof = tree.getProof(index);
+
+            let buffers = _proof.map((hex) => Buffer.from(hex.slice(2), "hex"));
+            // Concatenate all Buffers into one
+            let concatenatedBuffer = Buffer.concat(buffers);
+            // Calculate SHA-256 hash of the concatenated buffer
+            var _proofHash = crypto
+              .createHash("sha256")
+              .update(concatenatedBuffer)
+              .digest("hex");
+            // Do something with foundEntry
+            console.log("Found entry for", certs);
+            // You can return or process foundEntry here
+          } else {
+            console.log("No matching entry found for", certs);
+            return {
+              code: 400,
+              status: false,
+              message: messageCode.msgNoEntryMatchFound,
+              Details: certs,
+            };
+          }
+
+          let theObject = await getFormattedFields(foundEntry);
+          if (theObject) {
+            customFields = JSON.stringify(theObject, null, 2);
+          } else {
+            customFields = null;
+          }
+
+          var fields = {
+            Certificate_Number: foundEntry.documentID,
+            name: foundEntry.name,
+            customFields: customFields,
+            polygonLink: linkUrl,
+          };
+
+          var combinedHash = hashedBatchData[index];
+
+          // Generate encrypted URL with certificate data
+          var encryptLink = await generateEncryptedUrl(fields);
+
+          modifiedUrl = process.env.SHORT_URL + foundEntry.documentID;
+
+          let _qrCodeData = modifiedUrl != false ? modifiedUrl : encryptLink;
+
+          // Generate vibrant QR
+          const generateQr = await generateVibrantQr(
+            _qrCodeData,
+            qrside,
+            qrOption
+          );
+
+          if (!generateQr) {
+            var qrCodeImage = await QRCode.toDataURL(_qrCodeData, {
+              errorCorrectionLevel: "H",
+              width: qrside,
+              height: qrside,
+            });
+          }
+
+          const qrImageData = generateQr ? generateQr : qrCodeImage;
+          file = pdfFilePath;
+          console.log("The old file name", pdfFileName);
+          pdfFileName = `${foundEntry.documentID}.pdf`;
+          var outputPdf = pdfFileName;
+          console.log("The new file name", outputPdf);
+
+          if (!fs.existsSync(pdfFilePath)) {
+            return {
+              code: 400,
+              status: "FAILED",
+              message: messageCode.msgInvalidPdfUploaded,
+            };
+          }
+          // Add link and QR code to the PDF file
+          var opdf = await addDynamicLinkToPdf(
+            pdfFilePath,
+            outputPdf,
+            linkUrl,
+            qrImageData,
+            combinedHash,
+            posx,
+            posy
+          );
+          if (!fs.existsSync(outputPdf)) {
+            return {
+              code: 400,
+              status: "FAILED",
+              message: messageCode.msgInvalidFilePath,
+            };
+          }
+          // Read the generated PDF file
+          var fileBuffer = fs.readFileSync(outputPdf);
+
+          // Assuming fileBuffer is available
+          var outputPath = path.join(
+            __dirname,
+            "../../uploads",
+            customFolder,
+            "completed",
+            `${pdfFileName}`
+          );
+
+          if (bulkIssueStatus == "ZIP_STORE" || flag == 1) {
+            imageUrl = "";
+          } else {
+            var imageUrl = await _convertPdfBufferToPngWithRetry(
+              foundEntry.documentID,
+              fileBuffer,
+              pdfWidth,
+              pdfHeight
+            );
+            if (!imageUrl) {
+              return {
+                code: 400,
+                status: "FAILED",
+                message: messageCode.msgUploadError,
+              };
+            }
+            insertUrl.push(imageUrl);
+          }
+
+          try {
+            await isDBConnected();
+            var certificateData = {
+              email: email,
+              issuerId: issuerId,
+              batchId: allocateBatchId,
+              proofHash: _proof,
+              encodedProof: `0x${_proofHash}`,
+              transactionHash: txHash,
+              certificateHash: combinedHash,
+              certificateNumber: fields.Certificate_Number,
+              name: fields.name,
+              customFields: fields.customFields,
+              positionX: posx,
+              positionY: posy,
+              qrSize: qrside,
+              width: pdfWidth,
+              height: pdfHeight,
+              qrOption: qrOption,
+              url: imageUrl,
+            };
+            // await insertCertificateData(certificateData);
+            insertPromises.push(
+              insertDynamicBatchCertificateData(certificateData)
+            );
+          } catch (error) {
+            console.error("Error:", error);
+            return {
+              code: 400,
+              status: false,
+              message: messageCode.msgDBFailed,
+              Details: error,
+            };
+          }
+
+          // Always delete the source files (if it exists)
+          // if (fs.existsSync(file)) {
+          //   fs.unlinkSync(file);
+          // }
+
+          // Always delete the source files (if it exists)
+          if (fs.existsSync(outputPdf)) {
+            fs.unlinkSync(outputPdf);
+          }
+
+          if (bulkIssueStatus == "ZIP_STORE" || flag == 1) {
+            fs.writeFileSync(outputPath, fileBuffer);
+            console.log("File saved successfully at:", outputPath);
+          }
+        }
+        // Wait for all insert promises to resolve
+        await Promise.all(insertPromises);
+
+        const idExist = await isValidIssuer(email);
+        if (idExist.certificatesIssued == undefined) {
+          idExist.certificatesIssued = 0;
+        }
+        // If user with given id exists, update certificatesIssued count
+        const previousCount = idExist.certificatesIssued || 0; // Initialize to 0 if certificatesIssued field doesn't exist
+        idExist.certificatesIssued = previousCount + 1;
+        // If user with given id exists, update certificatesIssued transation fee
+        const previousrtransactionFee = idExist.transactionFee || 0; // Initialize to 0 if transactionFee field doesn't exist
+        idExist.transactionFee = previousrtransactionFee + txFee;
+        await idExist.save(); // Save the changes to the existing user
+
+        if (bulkIssueStatus == "ZIP_STORE" || flag == 1) {
+          return { code: 200, status: true };
+        }
+        return {
+          code: 200,
+          status: true,
+          message: messageCode.msgBatchIssuedSuccess,
+          Details: insertUrl,
+        };
+      } else {
+        // await wipeUploadFolder();
+        await wipeSourceFolder(customFolder);
+        return {
+          code: 400,
+          status: false,
+          message: messageCode.msgInputRecordsNotMatched,
+          Details: error,
+        };
+      }
+    } catch (error) {
+      // await wipeUploadFolder();
+      await wipeSourceFolder(customFolder);
+      return {
+        code: 400,
+        status: false,
+        message: messageCode.msgFailedToIssueBulkCerts,
+        Details: error,
+      };
+    }
+  } catch (error) {
+    // await wipeUploadFolder();
+    await wipeSourceFolder(customFolder);
+    return {
+      code: 500,
+      status: false,
+      message: messageCode.msgInternalError,
+      Details: error,
+    };
+  }
+};
+
+const _dynamicBulkCertificates = async (
   email,
   issuerId,
   _pdfReponse,
@@ -2415,6 +2768,7 @@ const dynamicBulkCertificates = async (
     };
   }
 };
+
 const failedErrorObject = {
   status: "FAILED",
   response: false,
@@ -2427,7 +2781,7 @@ const processListener = async (job) => {
   try {
 
     // Process the job
-    const result = await processBulkIssueJob(job,globalData);
+    const result = await processBulkIssueJob(job, globalData);
 
     // Check the result and handle failures
     if (result.status === false) {
@@ -2600,7 +2954,7 @@ const dynamicBatchCertificates = async (
 
         const jobDataCallback = (chunk) => ({
           pdfResponse: chunk,
-        
+
         });
         // Add jobs in chunks with custom job data
         const jobs = await addJobsInChunks(
@@ -2622,39 +2976,39 @@ const dynamicBatchCertificates = async (
             Details: failedErrorObject.Details // Include the failed details
           };
         } finally {
-         try {
-          await cleanUpJobs(bulkIssueQueue);
-          await wipeUploadFolder();
-          Object.assign(failedErrorObject, {
-            status: "FAILED",
-            response: false,
-            message: "",
-            Details: [],
-          });
-          // console.log("finally done")
-          setGlobalDataforQueue({
-            pdfWidth: null,
-            pdfHeight: null,
-            linkUrl: null,
-            qrside: null,
-            posx: null,
-            posy: null,
-            excelResponse: null,
-            hashedBatchData: null,
-            serializedTree: null,
-            email: null,
-            issuerId: null,
-            allocateBatchId: null,
-            txHash: null,
-            bulkIssueStatus: null,
-            flag: null,
-            qrOption: null,
-          })
-          
-         } catch (error) {
-          console.log("erro while deleting upload folder..", error.message)
-          
-         }
+          try {
+            await cleanUpJobs(bulkIssueQueue);
+            await wipeUploadFolder();
+            Object.assign(failedErrorObject, {
+              status: "FAILED",
+              response: false,
+              message: "",
+              Details: [],
+            });
+            // console.log("finally done")
+            setGlobalDataforQueue({
+              pdfWidth: null,
+              pdfHeight: null,
+              linkUrl: null,
+              qrside: null,
+              posx: null,
+              posy: null,
+              excelResponse: null,
+              hashedBatchData: null,
+              serializedTree: null,
+              email: null,
+              issuerId: null,
+              allocateBatchId: null,
+              txHash: null,
+              bulkIssueStatus: null,
+              flag: null,
+              qrOption: null,
+            })
+
+          } catch (error) {
+            console.log("erro while deleting upload folder..", error.message)
+
+          }
         }
 
         // // Wait for all insert promises to resolve

@@ -1595,6 +1595,39 @@ const wipeUploadFolder = async () => {
   }
 };
 
+const wipeSourceFolder = async (_path) => {
+  const folderPath = path.join(__dirname, '../../uploads', _path);
+  console.log("Input folder path", folderPath);
+  // Check if the folder exists
+  if (fs.existsSync(folderPath)) {
+    try {
+      // Delete the entire folder
+      fs.rmSync(folderPath, { recursive: true, force: true });
+      console.log(`Source folder deleted: ${folderPath}`);
+    } catch (error) {
+      console.error("Error deleting folder:", folderPath, error);
+    }
+  } else {
+    console.log(`Folder does not exist: ${folderPath}`);
+  }
+};
+
+const wipeSourceFile = async (_path) => {
+  try {
+    // Check if the file exists before attempting to delete it
+    if (fs.existsSync(_path)) {
+      fs.unlinkSync(_path);
+      console.log(`Deleted source zip file: ${_path}`);
+    } else {
+      console.log(`File does not exist: ${_path}`);
+    }
+  } catch (err) {
+    console.error('Error deleting the zip file:', err);
+  }
+};
+
+
+
 const isDBConnected = async (maxRetries = 5, retryDelay = 1500) => {
   let retryCount = 0;
 
@@ -1718,7 +1751,7 @@ const getCertificationStatus = async (certStatus) => {
 const getContractAddress = async (contractAddress, maxRetries = 3, delay = 1000) => {
   let attempt = 0;
 
-  if(contractAddress){
+  if (contractAddress) {
     console.log('RPC provider responding');
     return true;
   }
@@ -1750,7 +1783,7 @@ const getContractAddress = async (contractAddress, maxRetries = 3, delay = 1000)
 };
 
 const checkTransactionStatus = async (transactionHash) => {
-  if(transactionHash){
+  if (transactionHash) {
     return true;
   }
   try {
@@ -1809,6 +1842,18 @@ const getLatestTransferDate = async (address) => {
     return null; // Return null in case of error
   }
 };
+
+// Function to generate custom folder
+const generateCustomFolder = async (folderName) => {
+  try {
+    let currentDate = Date.now().toString();
+    let croppedDate = currentDate.slice(-5);
+    let customFolderName = folderName + croppedDate;
+    return customFolderName;
+  } catch (error) {
+    console.error("Error occuered while generating custom folder name", error);
+  }
+}
 
 module.exports = {
 
@@ -1927,6 +1972,8 @@ module.exports = {
 
   // Function to wipout folders in upload folder
   wipeUploadFolder,
+  wipeSourceFolder,
+  wipeSourceFile,
 
   // Function to check if MongoDB is connected
   isDBConnected,
@@ -1949,4 +1996,6 @@ module.exports = {
   getPdfDimensions,
 
   getLatestTransferDate,
+
+  generateCustomFolder,
 };

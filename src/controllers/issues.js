@@ -63,6 +63,9 @@ const {
   updateIssuerServiceCredits,
   validatePDFDimensions,
   verifyBulkDynamicPDFDimensions,
+  generateCustomFolder,
+  wipeSourceFolder,
+  wipeSourceFile,
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
 
 const { fetchOrEstimateTransactionFee } = require('../utils/upload');
@@ -489,7 +492,7 @@ const issueDynamicCredential = async (req, res) => {
       }
 
       issueResponse = await handleIssueDynamicCertification(email, certificateNumber, name, courseName, _grantDate, _expirationDate, req.file.path, _positionX, _positionY, _qrsize);
-    
+
     } else {
       return res.status(400).json({ status: "FAILED", message: messageCode.msgInvalidFlag });
     }
@@ -901,7 +904,7 @@ const batchIssueCertificate = async (req, res) => {
  * @param {Object} res - Express response object.
  */
 const dynamicBatchIssueCertificates = async (req, res) => {
- 
+
   var file = req?.file;
   // Check if the file path matches the pattern
   if (!req.file || !req.file.originalname.endsWith('.zip')) {
@@ -1077,7 +1080,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
       excelData = await handleBulkExcelFile(excelFilePath);
     } else {
       console.log("the input option", queueOption);
-      excelData = await handleBatchExcelFile(excelFilePath,issuerExist);
+      excelData = await handleBatchExcelFile(excelFilePath, issuerExist);
     }
 
     // await _fs.remove(filePath);
@@ -1278,7 +1281,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
 };
 
 const dynamicBatchIssueCredentials = async (req, res) => {
- 
+
   var file = req?.file;
   // Check if the file path matches the pattern
   if (!req.file || !req.file.originalname.endsWith('.zip')) {
@@ -1435,9 +1438,9 @@ const dynamicBatchIssueCredentials = async (req, res) => {
 
     // console.log(excelFilePath); // Output: ./uploads/sample.xlsx
     // Fetch the records from the Excel file
-   
+
     excelData = await handleBatchExcelFile(excelFilePath);
-    
+
     // await _fs.remove(filePath);
     if (excelData.response == false) {
       var errorDetails = (excelData.Details) ? excelData.Details : "";
@@ -1507,7 +1510,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
     }
 
     bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, flag);
-   
+
     if (bulkIssueStatus == 'ZIP_STORE' || flag == 1) {
       if (bulkIssueResponse.code == 200) {
         // Update Issuer credits limit (decrease by 1)
@@ -1626,6 +1629,398 @@ const dynamicBatchIssueCredentials = async (req, res) => {
   } catch (error) {
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
     await wipeUploadFolder();
+    return;
+  }
+};
+
+// For concurrency approach
+const dynamicBatchIssueConcurrency = async (req, res) => {
+
+  var file = req?.file;
+  // Check if the file path matches the pattern
+  if (!req.file || !req.file.originalname.endsWith('.zip')) {
+    // File path does not match the pattern
+    const errorMessage = messageCode.msgMustZip;
+    res.status(400).json({ code: 400, status: "FAILED", message: errorMessage });
+    // await cleanUploadFolder();
+    if (fs.existsSync(file)) {
+      fs.unlinkSync(file);
+    }
+    return;
+  }
+
+  var filesList = [];
+  // Initialize an empty array to store the file(s) ending with ".xlsx"
+  var xlsxFiles = [];
+  // Initialize an empty array to store the file(s) ending with ".pdf"
+  var pdfFiles = [];
+  var existIssuerId;
+  var qrOption = 0;
+  var excelData;
+  var bulkIssueResponse;
+  var destDirectory;
+
+
+  var today = new Date();
+  var options = {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false, // Use 24-hour format
+    timeZone: 'America/New_York' // Set the timezone to US Eastern Time
+  };
+
+  var formattedDateTime = today.toLocaleString('en-US', options).replace(/\//g, '-').replace(/,/g, '-').replace(/:/g, '-').replace(/\s/g, '');
+
+  const resultDierectory = path.join(__dirname, '../../uploads/completed');
+
+  try {
+    await isDBConnected();
+
+    var filePath = req.file.path;
+    const email = req.body.email;
+    const flag = parseInt(req.body.flag);
+    var queueOption;
+
+    // Verify with existing credits limit of an issuer to perform the operation
+    if (email) {
+      let dbStatus = await isDBConnected();
+      if (dbStatus) {
+        var issuerExist = await isValidIssuer(email);
+        if (issuerExist && issuerExist.issuerId) {
+          existIssuerId = issuerExist.issuerId;
+          let fetchCredits = await getIssuerServiceCredits(existIssuerId, 'issue');
+          if (fetchCredits === true) {
+            return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaStatus });
+          }
+          if (fetchCredits) {
+          } else {
+            return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaExceeded });
+          }
+        } else {
+          return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuerId });
+        }
+      }
+    }
+
+    const emailExist = await isValidIssuer(email);
+    const paramsExist = await DynamicParameters.findOne({ email: email });
+
+    if (!emailExist || !paramsExist) {
+      var messageContent = messageCode.msgInvalidEmail;
+      if (!paramsExist) {
+        messageContent = messageCode.msgInvalidParams;
+      }
+      res.status(400).json({ code: 400, status: "FAILED", message: messageContent, Details: email });
+      return;
+    }
+
+    if (emailExist.qrPreference) {
+      qrOption = emailExist.qrPreference;
+    }
+
+    const croppedId = (emailExist.issuerId) ? emailExist.issuerId.slice(-5) : '12345';
+    const customFolderName = await generateCustomFolder(croppedId);
+    // await wipeSourceFolder(customFolderName);
+
+    // Function to check if a file is empty
+    const stats = fs.statSync(filePath);
+    var zipFileSize = parseInt(stats.size);
+    if (zipFileSize <= 100) {
+      res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgUnableToFindFiles });
+      // await cleanUploadFolder();
+      await wipeUploadFolder();
+      return;
+    }
+    // Create a readable stream from the zip file
+    const readStream = fs.createReadStream(filePath);
+    const updatedDestinationPath = path.join(extractionPath, customFolderName);
+    destDirectory = path.join(__dirname, "../../uploads", updatedDestinationPath, "completed");
+    console.log("The updated folder", updatedDestinationPath);
+
+    if (fs.existsSync(destDirectory)) {
+      // Delete the existing directory recursively
+      fs.rmSync(destDirectory, { recursive: true });
+    }
+    // Pipe the read stream to the unzipper module for extraction
+    await new Promise((resolve, reject) => {
+      readStream.pipe(unzipper.Extract({ path: updatedDestinationPath }))
+        .on('error', err => {
+          console.error('Error extracting zip file:', err);
+          res.status(400).json({ status: "FAILED", message: messageCode.msgUnableToFindFiles, details: err });
+          reject(err);
+        })
+        .on('finish', () => {
+          console.log('Zip file extracted successfully.');
+          resolve();
+        });
+    });
+
+    filesList = await fs.promises.readdir(updatedDestinationPath);
+    // Delete the source zip file after extraction
+    await wipeSourceFile(filePath);
+
+    let zipExist = await _findDirectories(filesList, customFolderName);
+    if (zipExist) {
+      filesList = zipExist;
+    }
+    console.log("files", filesList, filesList.length);
+
+    if (filesList.length < 2) {
+      res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgUnableToFindFiles });
+      await wipeSourceFolder(customFolderName);
+      return;
+    }
+
+    filesList.forEach(file => {
+      if (file.endsWith('.xlsx')) {
+        xlsxFiles.push(file);
+      }
+    });
+
+    if (xlsxFiles.length == 0 || xlsxFiles.length > 1) {
+      var errorMessage = messageCode.msgUnableToFindExcelFiles;
+      var details = "";
+      if(xlsxFiles.length > 1){
+        errorMessage = messageCode.msgFindMoreExcelFiles;
+        details = xlsxFiles;
+      }
+      res.status(400).json({ code: 400, status: "FAILED", message: errorMessage, Details: details });
+      await wipeSourceFolder(customFolderName);
+      return;
+    }
+
+    filesList.forEach(file => {
+      if (file.endsWith('.pdf')) {
+        pdfFiles.push(file);
+      }
+    });
+
+    if (pdfFiles.length == 0) {
+      res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgUnableToFindPdfFiles });
+      await wipeSourceFolder(customFolderName);
+      return;
+    }
+
+    const excelFilePath = path.join(__dirname, '../../uploads', customFolderName, xlsxFiles[0]);
+
+
+    // console.log(excelFilePath); // Output: ./uploads/sample.xlsx
+    // Fetch the records from the Excel file
+    if (queueEnable == 0) {
+      var excelDataCount = await getExcelRecordsCount(excelFilePath);
+      console.log("the count", excelDataCount);
+      if (excelDataCount.data) {
+        queueOption = (excelDataCount.data >= cert_limit) ? queueOption = 1 : queueOption = 0;
+      } else {
+        res.status(400).json({ code: 400, status: "FAILED", message: excelDataCount.message });
+        await wipeSourceFolder(customFolderName);
+        return;
+      }
+    } else {
+      queueOption = 0;
+    }
+
+    if (queueOption == 0) {
+      excelData = await handleBulkExcelFile(excelFilePath);
+    } else {
+      console.log("the input option", queueOption);
+      excelData = await handleBatchExcelFile(excelFilePath, issuerExist);
+    }
+
+    if (excelData.response == false) {
+      var errorDetails = (excelData.Details) ? excelData.Details : "";
+      res.status(400).json({ code: 400, status: "FAILED", message: excelData.message, details: errorDetails });
+      await wipeSourceFolder(customFolderName);
+      return;
+    }
+
+    var excelDataResponse = excelData.message[0];
+
+    // Extract Certs values from data and append ".pdf"
+    const certsWithPDF = excelDataResponse.map(item => item.documentName + ".pdf");
+    // Compare certsWithPDF with data in Excel
+    const matchedDocs = pdfFiles.filter(cert => certsWithPDF.includes(cert));
+
+    if ((pdfFiles.length != matchedDocs.length) || (matchedDocs.length != excelData.message[1])) {
+      res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInputRecordsNotMatched });
+      await wipeSourceFolder(customFolderName);
+      return;
+    }
+
+    var pdfPagesValidation = [];
+    var pdfTemplateValidation = [];
+    for (let index = 0; index < pdfFiles.length; index++) {
+      try {
+        console.log("Processing file index:", index);
+        let targetDocument = pdfFiles[index];
+
+        // Construct the PDF file path
+        let pdfFilePath = path.join(__dirname, '../../uploads', customFolderName, targetDocument);
+
+        let templateBuffer = fs.readFileSync(pdfFilePath);
+        let pdfDoc = await PDFDocument.load(templateBuffer);
+        let pageCount = pdfDoc.getPageCount();
+        if (pageCount > 1) {
+          pdfPagesValidation.push(targetDocument);
+        }
+
+        // Validate PDF dimensions
+        let validityCheck = await validatePDFDimensions(pdfFilePath, paramsExist.pdfWidth, paramsExist.pdfHeight);
+
+        // Push invalid PDFs to the array
+        if (validityCheck === false) {
+          pdfTemplateValidation.push(targetDocument); // Use targetDocument instead of pdfFiles[index]
+        }
+      } catch (error) {
+        console.error("Error processing file:", pdfFiles[index], error);
+      }
+    }
+
+    if (pdfTemplateValidation.length > 0 || pdfPagesValidation.length > 0) {
+      let errorMessage = '';
+      let errorDetails = '';
+      if (pdfPagesValidation.length > 0) {
+        errorMessage = messageCode.msgMultipagePdfError;
+        errorDetails = pdfPagesValidation;
+      } else {
+        errorMessage = messageCode.msgInvalidPdfDimensions;
+        errorDetails = pdfTemplateValidation;
+      }
+      res.status(400).json({ code: 400, status: "FAILED", message: errorMessage, details: errorDetails });
+      await wipeSourceFolder(customFolderName);
+      return;
+    }
+
+  //  await wipeSourceFolder(customFolderName);
+  // console.log("the response is", excelData.Details);
+  //  return res.status(400).json({ code: 400, status: "WIP", message: messageCode.msgWorkInProgress });
+  
+    console.log("The queue option", queueOption);
+    if (queueOption == 0) {
+      bulkIssueResponse = await dynamicBulkCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
+    } else {
+      bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, flag);
+    }
+
+    if ((bulkIssueStatus == 'ZIP_STORE' && queueOption == 0) || (flag == 1 && queueOption == 0)) {
+      if (bulkIssueResponse.code == 200) {
+        // Update Issuer credits limit (decrease by 1)
+        await updateIssuerServiceCredits(existIssuerId, 'issue');
+
+        const zipFileName = `${formattedDateTime}.zip`;
+        const resultFilePath = path.join(__dirname, '../../uploads', customFolderName, zipFileName);
+
+        // Create a new zip archive
+        const archive = archiver('zip', {
+          zlib: { level: 9 } // Sets the compression level
+        });
+
+        // Create a write stream for the zip file
+        const output = fs.createWriteStream(resultFilePath);
+        if (cloudStore == 'S3_STORE') {
+          var fetchResultZipFile = path.basename(resultFilePath);
+        }
+
+        // Listen for close event of the archive
+        output.on('close', async () => {
+          console.log(archive.pointer() + ' total bytes');
+          if (cloudStore == 'S3_STORE') {
+            const fileBackup = await backupFileToCloud(fetchResultZipFile, resultFilePath, 2);
+            if (fileBackup.response == false) {
+              console.log("The S3 backup failed", fileBackup.details);
+            }
+          }
+          console.log('Zip file created successfully');
+          if (fs.existsSync(destDirectory)) {
+            // Delete the existing directory recursively
+            fs.rmSync(destDirectory, { recursive: true });
+          }
+          // Send the zip file as a download
+          res.download(resultFilePath, zipFileName, (err) => {
+            if (err) {
+              console.error('Error downloading zip file:', err);
+            }
+            // Delete the zip file after download
+            // fs.unlinkSync(resultFilePath);
+            fs.unlinkSync(resultFilePath, (err) => {
+              if (err) {
+                console.error('Error deleting zip file:', err);
+              }
+              console.log('Zip file deleted');
+            });
+          });
+        });
+
+        // Pipe the output stream to the zip archive
+        archive.pipe(output);
+        var excelFileName = path.basename(excelFilePath);
+        // Append the file to the list
+        pdfFiles.push(excelFileName);
+
+        // Add PDF files to the zip archive
+        pdfFiles.forEach(file => {
+          const filePath = path.join(destDirectory, file);
+          archive.file(filePath, { name: file });
+        });
+
+        // Finalize the zip archive
+        archive.finalize();
+
+        // Always delete the excel files (if it exists)
+        if (fs.existsSync(excelFilePath)) {
+          fs.unlinkSync(excelFilePath);
+        }
+        let uploadPath = path.join(__dirname, '../../uploads', customFolderName);
+        let files = fs.readdirSync(uploadPath);
+        console.log("Files remain", files);
+        // await flushUploadFolder();
+        // await removeEmptyFolders(uploadPath);
+        // let ifFileExist = path.join(uploadPath, file.filename);
+        // console.log("The file", file, ifFileExist);
+        // if (fs.existsSync(ifFileExist)) {
+        //   fs.unlinkSync(ifFileExist);
+        // }
+        await wipeSourceFolder(customFolderName);
+        return;
+      } else {
+        var statusCode = bulkIssueResponse.code || 400;
+        var statusMessage = bulkIssueResponse.message || messageCode.msgFailedToIssueBulkCerts;
+        var statusDetails = bulkIssueResponse.Details || "";
+        res.status(statusCode).json({ code: statusCode, status: "FAILED", message: statusMessage, details: statusDetails });
+        await wipeSourceFolder(customFolderName);
+        return;
+      }
+    }
+
+    if (bulkIssueResponse.code == 200) {
+      // Update Issuer credits limit (decrease by 1)
+      await updateIssuerServiceCredits(existIssuerId, 'issue');
+      let bulkResponse = {
+        email: emailExist.email,
+        issuerId: emailExist.issuerId,
+        height: paramsExist.pdfHeight,
+        width: paramsExist.pdfWidth,
+        urls: bulkIssueResponse.Details
+      }
+      res.status(bulkIssueResponse.code).json({ code: bulkIssueResponse.code, status: "SUCCESS", message: messageCode.msgBatchIssuedSuccess, details: bulkResponse });
+      await wipeSourceFolder(customFolderName);
+      return;
+    } else {
+      var statusCode = bulkIssueResponse.code || 400;
+      var statusMessage = bulkIssueResponse.message || messageCode.msgFailedToIssueBulkCerts;
+      var statusDetails = bulkIssueResponse.Details || "";
+      res.status(statusCode).json({ code: statusCode, status: "FAILED", message: statusMessage, details: statusDetails });
+      await wipeSourceFolder(customFolderName);
+      return;
+    }
+
+  } catch (error) {
+    res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
+    await wipeSourceFolder(customFolderName);
     return;
   }
 };
@@ -2018,6 +2413,86 @@ const findDirectories = async (items) => {
   return movedFiles;
 };
 
+const _findDirectories = async (items, endFolder) => {
+  const results = [];
+  const movedFiles = [];
+  const updatedPath = path.join(uploadPath, endFolder);
+  console.log("The end folder", updatedPath);
+
+  // Ensure uploadPath exists
+  try {
+    if (!fs.existsSync(updatedPath)) {
+      fs.mkdirSync(updatedPath, { recursive: true });
+      console.log(`Created uploadPath: ${updatedPath}`);
+    }
+  } catch (err) {
+    console.error(`Error ensuring uploadPath exists:`, err);
+    return false; // Return empty array if there's an error
+  }
+
+  for (const item of items) {
+    const fullPath = path.join(updatedPath, item);
+    try {
+      const stats = fs.statSync(fullPath);
+      if (stats.isDirectory()) {
+        results.push(fullPath);
+      }
+    } catch (err) {
+      // Ignore errors (e.g., file not found)
+    }
+  }
+
+  if (results.length > 0) {
+    // console.log('Directories found:', results);
+    for (const dir of results) {
+      // console.log(`Files in directory ${dir}:`);
+      try {
+        const files = fs.readdirSync(dir);
+        files.forEach(file => {
+          const oldPath = path.join(dir, file);
+          const newPath = path.join(updatedPath, file);
+
+          // Move file
+          try {
+            fs.renameSync(oldPath, newPath);
+            movedFiles.push(file); // Add moved file to the list
+            // console.log(`Moved ${file} to ${uploadPath}`);
+          } catch (err) {
+            console.error(`Error moving file ${file}:`, err);
+          }
+        });
+
+        // Remove the directory if it's empty
+        try {
+          // Check if the directory still exists before trying to read it
+          if (fs.existsSync(dir)) {
+            const remainingFiles = fs.readdirSync(dir);
+            if (remainingFiles.length === 0) {
+              console.log("Directory path", dir);
+              fs.rmdirSync(dir);
+              // fs.unlinkSync(dir);
+              console.log(`Removed empty directory ${dir}`);
+            }
+          } else {
+            console.warn(`Directory ${dir} does not exist anymore`);
+          }
+        } catch (err) {
+          console.error(`Error removing directory ${dir}:`, err);
+        }
+
+      } catch (err) {
+        console.error(`Error reading directory ${dir}:`, err);
+      }
+    }
+  } else {
+    console.log('No additional directories found');
+    return false;
+  }
+  // Return the list of moved files
+  // console.log("Files", movedFiles);
+  return movedFiles;
+};
+
 const issueBatchCertificateWithRetry = async (root, expirationEpoch, retryCount = 3) => {
   const newContract = await connectToPolygonIssue();
   if (!newContract) {
@@ -2162,6 +2637,7 @@ module.exports = {
   // Function to issue a Dynamic Bulk issues (batch) of certifications
   dynamicBatchIssueCertificates,
   dynamicBatchIssueCredentials,
+  dynamicBatchIssueConcurrency,
 
   // Function to accept pdf & qr dimensions  Batch of certifications
   acceptDynamicInputs,
