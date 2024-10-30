@@ -491,6 +491,10 @@ const decodeQRScan = async (req, res) => {
               "certificateUrl" : isDynamicCertificateExist.url
             }
 
+            if(isDynamicCertificateExist.certificateStatus == 3){
+              return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertRevoked });
+            }
+
             let txStatus = await checkTransactionStatus(isDynamicCertificateExist.transactionHash);
             formattedDynamicResponse.blockchainStatus = txStatus;
 
@@ -785,7 +789,11 @@ const verifyCertificationId = async (req, res) => {
         let inputFileExist = await hasFilesInDirectory(uploadsPath);
         if (inputFileExist) {
           // Clean up the upload folder
-          await cleanUploadFolder();
+          // await cleanUploadFolder();
+        }
+
+        if(isDynamicCertificateExist.certificateStatus == 3){
+          return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertRevoked });
         }
 
         let txStatus = await checkTransactionStatus(isDynamicCertificateExist.transactionHash);
