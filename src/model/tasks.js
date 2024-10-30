@@ -84,14 +84,14 @@ const mailOptions = {
   // Specify the sender's information
   from: {
     // Name of the sender
-    name: 'AICerts Admin',
+    name: 'Certs365 Admin',
     // Sender's email address (obtained from environment variable)
     address: process.env.USER_MAIL,
   },
   // Specify the recipient's email address (to be filled dynamically)
   to: '', // replace with recipient's email address
   // Subject line of the email
-  subject: 'AICerts Admin Notification',
+  subject: 'Certs365 Admin Notification',
   // Plain text content of the email body (to be filled dynamically)
   text: '', // replace with text content of the email body
 };
@@ -1619,7 +1619,7 @@ const sendEmail = async (name, email) => {
   try {
     // Update the mailOptions object with the recipient's email address and email body
     mailOptions.to = email;
-    mailOptions.subject = `Your AICerts Account is Approved!`;
+    mailOptions.subject = `Your Certs365 Account is Approved!`;
     mailOptions.text = `Hi ${name},
 
 Congratulations! Your account has been successfully approved by our admin team.
@@ -1629,7 +1629,7 @@ You can now log in to your profile using your username ${email}. We are excited 
 If you have any questions or need assistance, feel free to reach out.
 
 Best regards,
-The AICerts Team.`;
+The Certs365 Team.`;
 
     // Send the email using the configured transporter
     transporter.sendMail(mailOptions);
@@ -1651,15 +1651,15 @@ const rejectEmail = async (name, email) => {
   try {
     // Update the mailOptions object with the recipient's email address and email body
     mailOptions.to = email;
-    mailOptions.subject = `Your AICerts Account Registration Status`;
+    mailOptions.subject = `Your Certs365 Account Registration Status`;
     mailOptions.text = `Hi ${name},
 
 We regret to inform you that your account registration has been declined by our admin team.
 
-If you have any questions or need further clarification, please do not hesitate to contact us. Thank you for your interest in AICerts.
+If you have any questions or need further clarification, please do not hesitate to contact us. Thank you for your interest in Certs365.
 
 Best regards,
-The AICerts Team.`;
+The Certs365 Team.`;
 
     // Send the email using the configured transporter
     transporter.sendMail(mailOptions);
