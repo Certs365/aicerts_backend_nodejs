@@ -943,8 +943,6 @@ const dynamicBatchIssueCertificates = async (req, res) => {
 
   var formattedDateTime = today.toLocaleString('en-US', options).replace(/\//g, '-').replace(/,/g, '-').replace(/:/g, '-').replace(/\s/g, '');
 
-  const resultDierectory = path.join(__dirname, '../../uploads/completed');
-
   try {
     await isDBConnected();
 
@@ -1675,8 +1673,6 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
 
   var formattedDateTime = today.toLocaleString('en-US', options).replace(/\//g, '-').replace(/,/g, '-').replace(/:/g, '-').replace(/\s/g, '');
 
-  const resultDierectory = path.join(__dirname, '../../uploads/completed');
-
   try {
     await isDBConnected();
 
@@ -1824,7 +1820,7 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
       queueOption = 0;
     }
 
-    if (queueOption == 0) {
+    if (queueOption != 0) {
       excelData = await handleBulkExcelFile(excelFilePath);
     } else {
       console.log("the input option", queueOption);
@@ -1900,10 +1896,10 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
   //  return res.status(400).json({ code: 400, status: "WIP", message: messageCode.msgWorkInProgress });
   
     console.log("The queue option", queueOption);
-    if (queueOption == 0) {
+    if (queueOption != 0) {
       bulkIssueResponse = await dynamicBulkCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
     } else {
-      bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, flag);
+      bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
     }
 
     if ((bulkIssueStatus == 'ZIP_STORE' && queueOption == 0) || (flag == 1 && queueOption == 0)) {

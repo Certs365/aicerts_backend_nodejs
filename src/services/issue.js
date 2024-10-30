@@ -2815,6 +2815,7 @@ const dynamicBatchCertificates = async (
   pdfWidth,
   pdfHeight,
   qrOption,
+  customFolder,
   flag
 ) => {
   const newContract = await connectToPolygon();
@@ -2841,7 +2842,7 @@ const dynamicBatchCertificates = async (
 
   try {
     // Check if the directory exists, if not, create it
-    const destDirectory = path.join(__dirname, "../../uploads/completed");
+    const destDirectory = path.join(__dirname, "../../uploads/" ,customFolder, "completed");
     console.log("Present working directory", __dirname, destDirectory);
 
     if (bulkIssueStatus == "ZIP_STORE" || flag == 1) {
@@ -2946,9 +2947,9 @@ const dynamicBatchCertificates = async (
           allocateBatchId,
           txHash,
           bulkIssueStatus,
+          customFolder,
           flag,
           qrOption,
-
         })
 
 
@@ -3001,6 +3002,7 @@ const dynamicBatchCertificates = async (
               allocateBatchId: null,
               txHash: null,
               bulkIssueStatus: null,
+              customFolder: null,
               flag: null,
               qrOption: null,
             })

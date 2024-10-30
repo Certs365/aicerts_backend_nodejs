@@ -8,6 +8,8 @@ const {
   isCertificationIdExisted,
   isBulkCertificationIdExisted,
   wipeUploadFolder,
+  wipeSourceFolder,
+  generateCustomFolder,
 } = require("../model/tasks"); // Importing functions from the '../model/tasks' module
 
 // Import MongoDB models
@@ -455,6 +457,9 @@ const handleBatchExcelFile = async (_path, issuer) => {
       message: "Failed to provide excel file",
     };
   }
+  // Extract the folder name
+  const folderName = path.basename(path.dirname(_path));
+
   // api to fetch excel data into json
   const newPath = path.join(..._path.split("\\"));
   const sheetNames = await readXlsxFile.readSheetNames(newPath);
@@ -561,14 +566,16 @@ const handleBatchExcelFile = async (_path, issuer) => {
         const repetitiveNumbers = await findRepetitiveIdNumbers(documentIDs);
         if (repetitiveNumbers.length > 0) {
           return { status: "FAILED", response: false, message: messageCode.msgExcelRepetetionIds, Details: repetitiveNumbers };
-      }
+        }
 
         const chunkSize = parseInt(process.env.EXCEL_CHUNK);
         const concurrency = parseInt(process.env.EXCEL_CONC);
         console.log(`chunk size : ${chunkSize} concurrency : ${concurrency}`);
+        
         // Generate a batchId for this job processing
-        const issuerId = new Date().getTime(); // Unique identifier (you can use other approaches too)
-
+        // const issuerId = new Date().getTime(); // Unique identifier (you can use other approaches too)
+        var issuerId = await generateCustomFolder(12345); // Unique identifier (you can use other approaches too)
+console.log("The pocess ID", issuerId);
         const redisConfig = {
           redis: {
             port: process.env.REDIS_PORT || 6379, // Redis port (6380 from your env)
@@ -617,7 +624,8 @@ const handleBatchExcelFile = async (_path, issuer) => {
           });
           await cleanUpJobs(bulkIssueExcelQueueProcessor);
         } catch (error) {
-          await wipeUploadFolder();
+          // await wipeUploadFolder();
+          await wipeSourceFolder(folderName);
           return {
             status: 400,
             response: false,
@@ -626,7 +634,7 @@ const handleBatchExcelFile = async (_path, issuer) => {
           };
         } finally {
           try {
-            // await wipeUploadFolder();
+            // await wipeSourceFolder(folderName);
             // Remove the process listener after processing jobs
             bulkIssueExcelQueueProcessor.removeAllListeners();
 
@@ -640,8 +648,6 @@ const handleBatchExcelFile = async (_path, issuer) => {
 
           } catch (error) {
             console.log("error while wiping upload folder in handleExcel", error.message);
-
-
           }
         }
         console.log("all jobs for excel data completed...");

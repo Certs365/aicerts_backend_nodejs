@@ -102,6 +102,7 @@ async function processBulkIssueJob(job,globalData) {
     txHash,
     bulkIssueStatus,
     flag,
+    customFolder,
     qrOption,
   } = globalData;
 
@@ -127,6 +128,7 @@ async function processBulkIssueJob(job,globalData) {
         txHash,
         bulkIssueStatus,
         flag,
+        customFolder,
         qrOption,
         certificateDataArray,
       });
@@ -180,6 +182,7 @@ async function processSinglePdf({
   bulkIssueStatus,
   flag,
   insertPromises,
+  customFolder,
   qrOption,
   certificateDataArray,
 }) {
@@ -188,7 +191,7 @@ async function processSinglePdf({
     let imageUrl = "";
     const treeData = JSON.parse(serializedTree);
     const tree = StandardMerkleTree.load(treeData);
-    const pdfFilePath = path.join(__dirname, "../../uploads", pdfFileName);
+    const pdfFilePath = path.join(__dirname, "../../uploads", customFolder, pdfFileName);
     console.log("pdf directory path", pdfFilePath);
     // Extract Certs from pdfFileName
     const certs = pdfFileName.split(".")[0]; // Remove file extension
@@ -225,23 +228,7 @@ async function processSinglePdf({
 
     var combinedHash = hashedBatchData[index];
 
-    // const encryptLink = await generateEncryptedUrl(fields);
-
-    // if (encryptLink) {
-    //   let dbStatus = await isDBConnected();
-    //   if (dbStatus) {
-    //     let urlData = {
-    //       email: email,
-    //       certificateNumber: foundEntry.documentID,
-    //       url: encryptLink,
-    //     };
-    //     await insertUrlData(urlData);
-    //     shortUrlStatus = true;
-    //   }
-    // }
-    // if (shortUrlStatus) {
       modifiedUrl = process.env.SHORT_URL + foundEntry.documentID;
-    // }
 
     let _qrCodeData = modifiedUrl 
     // Generate vibrant QR
@@ -257,6 +244,7 @@ async function processSinglePdf({
 
     const qrImageData = generateQr ? generateQr : qrCodeImage;
     var file = pdfFilePath;
+    pdfFileName = `${foundEntry.documentID}.pdf`;
     var outputPdf = `${pdfFileName}`;
 
     // Add link and QR code to the PDF file
@@ -284,6 +272,7 @@ async function processSinglePdf({
     var outputPath = path.join(
       __dirname,
       "../../uploads",
+      customFolder,
       "completed",
       `${pdfFileName}`
     );

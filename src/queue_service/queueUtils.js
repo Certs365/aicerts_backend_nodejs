@@ -161,6 +161,7 @@ const globalStore = {
   txHash: null,
   bulkIssueStatus: null,
   flag: null,
+  customFolder: null,
   qrOption: null,
 };
 
