@@ -588,7 +588,7 @@ const handleBatchExcelFile = async (_path, issuer) => {
             host: process.env.REDIS_HOST || "localhost", // Redis host (127.0.0.1 from your env)
           },
         };
-        await cleanRedis(redisConfig);
+        // await cleanRedis(redisConfig);
 
         // Create a unique queue name for each issuerId to handle concurrency
         const queueName = `bulkIssueExcelQueueProcessor${issuerId}`;

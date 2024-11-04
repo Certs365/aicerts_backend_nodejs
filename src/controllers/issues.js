@@ -121,9 +121,11 @@ const issuePdf = async (req, res) => {
   if (pdfDoc.getPageCount() > 1) {
     // Respond with success status and certificate details
     // await cleanUploadFolder();
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    // if (fs.existsSync(file)) {
+    //   fs.unlinkSync(file);
+    // }
+    // Delete the source file
+    await wipeSourceFile(req.file.path);
     return res.status(400).json({ status: "FAILED", message: messageCode.msgMultiPagePdf });
   }
   try {

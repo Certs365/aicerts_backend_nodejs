@@ -52,6 +52,7 @@ const {
   isCertificationIdExisted,
   getContractAddress,
   getPdfDimensions,
+  generateCustomFolder,
   wipeUploadFolder,
   wipeSourceFolder,
 } = require("../model/tasks"); // Importing functions from the '../model/tasks' module
@@ -2921,6 +2922,12 @@ const dynamicBatchCertificates = async (
         const concurrency = parseInt(process.env.BULK_ISSUE_CHUNK);
         console.log(`chunk size : ${chunkSize} concurrency : ${concurrency}`);
 
+        // Generate a random 6-digit number
+        const generatedJobId = Math.floor(100000 + Math.random() * 900000);
+        var queueId = await generateCustomFolder(generatedJobId); // Unique identifier (you can use other approaches too)
+        // Unique ID for each call
+        console.log("The pocess ID", queueId);
+
         // Define the Redis connection options
         const redisConfig = {
           redis: {
@@ -2928,7 +2935,7 @@ const dynamicBatchCertificates = async (
             host: process.env.REDIS_HOST || "localhost", // Redis host (127.0.0.1 from your env)
           },
         };
-        const queueName = `bulkIssueQueue${issuerId}`;
+        const queueName = `bulkIssueQueue${queueId}`;
 
         const bulkIssueQueue = new Queue(queueName, redisConfig);
 
@@ -2979,7 +2986,7 @@ const dynamicBatchCertificates = async (
         } finally {
           try {
             await cleanUpJobs(bulkIssueQueue);
-            await wipeUploadFolder();
+            await wipeSourceFolder(customFolder);
             Object.assign(failedErrorObject, {
               status: "FAILED",
               response: false,

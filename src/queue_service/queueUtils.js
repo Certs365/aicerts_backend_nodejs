@@ -61,7 +61,7 @@ async function addJobsInChunks(queue, data, chunkSize, jobDataCallback) {
 }
 
 async function cleanUpJobs(queue) {
-  console.log("The job deletion log for I name:", queue.name);
+  console.log("The job deletion log for the name:", queue.name);
   try {
     // Clean completed and failed jobs immediately
     await queue.clean(0, 'completed');
