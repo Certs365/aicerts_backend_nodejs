@@ -3,19 +3,13 @@ const { StandardMerkleTree } = require("@openzeppelin/merkle-tree");
 const messageCode = require("../common/codes");
 const {
   isDBConnected,
-  insertUrlData,
   addDynamicLinkToPdf,
-  insertBulkBatchIssueData,
-  deletePngFiles,
   holdExecution,
-  insertDynamicBatchCertificateData,
 } = require("../model/tasks");
 const QRCode = require("qrcode");
 const crypto = require("crypto"); // Module for cryptographic functions
-const { generateEncryptedUrl } = require("../common/cryptoFunction");
 const fs = require("fs");
 const path = require("path");
-const { fromBuffer, fromBase64 } = require("pdf2pic");
 const AWS = require("../config/aws-config");
 const {
   generateVibrantQr,

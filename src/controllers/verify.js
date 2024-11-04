@@ -727,7 +727,7 @@ const verifyCertificationId = async (req, res) => {
           let inputFileExist = await hasFilesInDirectory(uploadsPath);
           if (inputFileExist) {
             // Clean up the upload folder
-            await cleanUploadFolder();
+            // await cleanUploadFolder();
           }
 
           let txStatus = await checkTransactionStatus(isIdExist.transactionHash);
@@ -766,7 +766,7 @@ const verifyCertificationId = async (req, res) => {
         let inputFileExist = await hasFilesInDirectory(uploadsPath);
         if (inputFileExist) {
           // Clean up the upload folder
-          await cleanUploadFolder();
+          // await cleanUploadFolder();
         }
 
         let txStatus = await checkTransactionStatus(isIdExist.transactionHash);

@@ -107,36 +107,6 @@ async function cleanUpStalledCheck(queueName) {
   }
 }
 
-async function _cleanUpJobs(queue, jobId) {
-  console.log("The job deletion log for ID:", jobId);
-  try {
-    // Fetch completed jobs and selectively remove the specific job
-    const completedJobs = await queue.getJobs(['completed']);
-    for (const job of completedJobs) {
-      if (job.id === jobId) {
-        await job.remove();
-        console.log(`Completed job ${job.id} removed`);
-      }
-    }
-
-    // Fetch failed jobs and selectively remove the specific job
-    const failedJobs = await queue.getJobs(['failed']);
-    for (const job of failedJobs) {
-      if (job.id === jobId) {
-        await job.remove();
-        console.log(`Failed job ${job.id} removed`);
-      }
-    }
-
-  } catch (error) {
-    console.error('Error during selective job cleanup:', error);
-  } finally {
-    console.log('Selective cleanup completed for specific job');
-  }
-}
-
-
-
 // Wait for all jobs to complete with error handling
 const waitForJobsToComplete = async (jobs) => {
   try {
@@ -232,7 +202,6 @@ module.exports = {
   addJobsInChunks,
   waitForJobsToComplete,
   cleanUpJobs,
-  _cleanUpJobs,
   processExcelJob,
   getChunkSizeAndConcurrency,
   cleanRedis,
