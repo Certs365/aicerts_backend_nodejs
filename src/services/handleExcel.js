@@ -45,7 +45,7 @@ const expectedBulkHeadersSchema = [
 ];
 
 const messageCode = require("../common/codes");
-const { cleanUpJobs, addJobsInChunks, processExcelJob, cleanRedis } = require("../queue_service/queueUtils");
+const { cleanUpJobs, _cleanUpJobs, addJobsInChunks, processExcelJob, cleanRedis } = require("../queue_service/queueUtils");
 
 const handleExcelFile = async (_path) => {
   if (!_path) {
@@ -423,6 +423,7 @@ const failedErrorObject = {
   message: "",
   Details: [],
 };
+
 const processListener = async (job) => {
   try {
     const result = await processExcelJob(job);
@@ -459,6 +460,7 @@ const handleBatchExcelFile = async (_path, issuer) => {
   }
   // Extract the folder name
   const folderName = path.basename(path.dirname(_path));
+  var jobId = 0;
 
   // api to fetch excel data into json
   const newPath = path.join(..._path.split("\\"));
@@ -571,19 +573,25 @@ const handleBatchExcelFile = async (_path, issuer) => {
         const chunkSize = parseInt(process.env.EXCEL_CHUNK);
         const concurrency = parseInt(process.env.EXCEL_CONC);
         console.log(`chunk size : ${chunkSize} concurrency : ${concurrency}`);
-        
+
         // Generate a batchId for this job processing
         // const issuerId = new Date().getTime(); // Unique identifier (you can use other approaches too)
-        var issuerId = await generateCustomFolder(12345); // Unique identifier (you can use other approaches too)
-console.log("The pocess ID", issuerId);
+        // Generate a random 6-digit number
+        const generatedJobId = Math.floor(100000 + Math.random() * 900000);
+        var issuerId = await generateCustomFolder(generatedJobId); // Unique identifier (you can use other approaches too)
+        // Unique ID for each call
+        // var issuerId = uuidv4();
+        console.log("The pocess ID", issuerId);
         const redisConfig = {
           redis: {
             port: process.env.REDIS_PORT || 6379, // Redis port (6380 from your env)
             host: process.env.REDIS_HOST || "localhost", // Redis host (127.0.0.1 from your env)
           },
         };
-        await cleanRedis(redisConfig)
-        const queueName = `bulkIssueExcelQueueProcessor${issuer}`;
+        await cleanRedis(redisConfig);
+
+        // Create a unique queue name for each issuerId to handle concurrency
+        const queueName = `bulkIssueExcelQueueProcessor${issuerId}`;
         const bulkIssueExcelQueueProcessor = new Queue(queueName, redisConfig);
         // Handle Redis connection error
         let redisConnectionFailed = false;
@@ -609,7 +617,9 @@ console.log("The pocess ID", issuerId);
             message: "Redis connection failed. Please check and try again later.",
           };
         }
-        bulkIssueExcelQueueProcessor.process(concurrency, processListener);
+        // bulkIssueExcelQueueProcessor.process(concurrency, processListener);
+        bulkIssueExcelQueueProcessor.process(concurrency, async (job) => await processListener(job));
+
         // Add jobs in chunks, passing batchId as part of job data
         const jobs = await addJobsInChunks(
           bulkIssueExcelQueueProcessor,
@@ -617,12 +627,21 @@ console.log("The pocess ID", issuerId);
           chunkSize,
           (chunk) => ({ chunk, rows, issuerId }) // Include batchId in job data
         );
+
+        // Assuming `jobs` is an array of job objects
+        jobs.forEach((job, index) => {
+          console.log(`Issuer ID for Job ${index + 1}:`, job.data.issuerId);
+          jobId = job.data.issuerId;
+        });
+        console.log("The process job id", jobId);
         try {
           await waitForJobsToComplete(jobs).catch(async (err) => {
             await cleanUpJobs(bulkIssueExcelQueueProcessor);
+            // await _cleanUpJobs(bulkIssueExcelQueueProcessor, jobId);
             throw err;
           });
           await cleanUpJobs(bulkIssueExcelQueueProcessor);
+          // await _cleanUpJobs(bulkIssueExcelQueueProcessor, jobId);
         } catch (error) {
           // await wipeUploadFolder();
           await wipeSourceFolder(folderName);

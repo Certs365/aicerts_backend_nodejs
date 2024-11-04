@@ -1,13 +1,13 @@
 // queueUtils.js
-const Redis = require("ioredis")
+const Redis = require("ioredis");
 
 
 const processBulkExcelJobs = require("./bulkIssueExcelQueueProcessor")
 
- const processExcelJob = async (job) => {
+const processExcelJob = async (job) => {
   try {
-    const { chunk,rows, batchId } = job.data;
-    const result = await processBulkExcelJobs(chunk,rows, job.id);
+    const { chunk, rows, batchId } = job.data;
+    const result = await processBulkExcelJobs(chunk, rows, job.id);
 
     // If the result status is FAILED, return an error object
     if (result.status === "FAILED") {
@@ -44,7 +44,7 @@ async function addJobsInChunks(queue, data, chunkSize, jobDataCallback) {
       const chunk = data.slice(i, i + chunkSize);
       const jobData = jobDataCallback ? jobDataCallback(chunk) : chunk; // Use callback or default to chunk
       // Add job to the queue
-      const job = await queue.add(jobData, {attempts:2} );
+      const job = await queue.add(jobData, { attempts: 2 });
       console.log("job added to bulkIssue Queue", i)
       jobs.push(job);
     }
@@ -61,11 +61,12 @@ async function addJobsInChunks(queue, data, chunkSize, jobDataCallback) {
 }
 
 async function cleanUpJobs(queue) {
+  console.log("The job deletion log for I name:", queue.name);
   try {
     // Clean completed and failed jobs immediately
-    await queue.clean(0, 'completed'); 
-    await queue.clean(0, 'failed'); 
-    
+    await queue.clean(0, 'completed');
+    await queue.clean(0, 'failed');
+
   } catch (error) {
     console.error('Error during job cleanup:', error);
   } finally {
@@ -81,7 +82,60 @@ async function cleanUpJobs(queue) {
       console.log('Queue closed');
     }
   }
+};
+
+async function cleanUpStalledCheck(queueName) {
+  const redis = new Redis(); // Defaults to localhost:6379; configure if needed
+  try {
+    // Define the stalled-check key pattern based on queue name
+    const keyPattern = `bull:${queueName}:stalled-check`;
+    console.log("the key pattern", keyPattern);
+    // Find matching keys (like stalled-check)
+    const keys = await redis.keys(keyPattern);
+
+    if (keys.length > 0) {
+      // Delete all keys that match the pattern
+      await Promise.all(keys.map(key => redis.del(key)));
+      console.log(`Deleted stalled-check keys for queue: ${queueName}`);
+    } else {
+      console.log(`No stalled-check keys found for queue: ${queueName}`);
+    }
+  } catch (error) {
+    console.error("Error deleting stalled-check keys:", error);
+  } finally {
+    await redis.disconnect();
+  }
 }
+
+async function _cleanUpJobs(queue, jobId) {
+  console.log("The job deletion log for ID:", jobId);
+  try {
+    // Fetch completed jobs and selectively remove the specific job
+    const completedJobs = await queue.getJobs(['completed']);
+    for (const job of completedJobs) {
+      if (job.id === jobId) {
+        await job.remove();
+        console.log(`Completed job ${job.id} removed`);
+      }
+    }
+
+    // Fetch failed jobs and selectively remove the specific job
+    const failedJobs = await queue.getJobs(['failed']);
+    for (const job of failedJobs) {
+      if (job.id === jobId) {
+        await job.remove();
+        console.log(`Failed job ${job.id} removed`);
+      }
+    }
+
+  } catch (error) {
+    console.error('Error during selective job cleanup:', error);
+  } finally {
+    console.log('Selective cleanup completed for specific job');
+  }
+}
+
+
 
 // Wait for all jobs to complete with error handling
 const waitForJobsToComplete = async (jobs) => {
@@ -99,9 +153,9 @@ const waitForJobsToComplete = async (jobs) => {
         })
       )
     );
-    
+
     // Extract all URLS from the results
-    const allUrls = results.flatMap((result)=>{
+    const allUrls = results.flatMap((result) => {
       console.log(result.URLS)
       return result.URLS
     });
@@ -134,7 +188,7 @@ const getChunkSizeAndConcurrency = (count) => {
 
 const cleanRedis = async (redisConfig) => {
   const redisClient = new Redis(redisConfig.redis.port, redisConfig.redis.host);
-  
+
   try {
     await redisClient.flushdb(); // Clears the current database
     console.log('Redis database cleaned successfully.');
@@ -165,7 +219,7 @@ const globalStore = {
   qrOption: null,
 };
 
-const setGlobalDataforQueue = (data)=>{
+const setGlobalDataforQueue = (data) => {
   Object.assign(globalStore, data);
 
 }
@@ -178,6 +232,7 @@ module.exports = {
   addJobsInChunks,
   waitForJobsToComplete,
   cleanUpJobs,
+  _cleanUpJobs,
   processExcelJob,
   getChunkSizeAndConcurrency,
   cleanRedis,
