@@ -444,7 +444,7 @@ router.post('/issuance', validationRoute.issuance, ensureAuthenticated, adminCon
  *               message: The service is temporarily unavailable due to inactive/insufficient credits. Please try again later.
  */
 
-router.post('/issue-pdf', _upload.single("file"), adminController.issuePdf);
+router.post('/issue-pdf', _upload.single("file"), ensureAuthenticated, adminController.issuePdf);
 
 /**
  * @swagger
@@ -558,7 +558,7 @@ router.post('/issue-pdf', _upload.single("file"), adminController.issuePdf);
  *               message: Internal Server Error.
  */
 
-router.post('/issue-dynamic-pdf', _upload.single("file"), adminController.issueDynamicPdf);
+router.post('/issue-dynamic-pdf', _upload.single("file"), ensureAuthenticated, adminController.issueDynamicPdf);
 
 /**
  * @swagger
@@ -686,7 +686,7 @@ router.post('/issue-dynamic-pdf', _upload.single("file"), adminController.issueD
  *               message: Internal Server Error.
  */
 
-router.post('/issue-dynamic-cert', _upload.single("file"), adminController.issueDynamicCredential);
+router.post('/issue-dynamic-cert', _upload.single("file"), ensureAuthenticated, adminController.issueDynamicCredential);
 
 /**
  * @swagger
@@ -810,7 +810,7 @@ router.post('/issue-dynamic-cert', _upload.single("file"), adminController.issue
  *               message: The service is temporarily unavailable due to inactive/insufficient credits. Please try again later.
  */
 
-router.post('/batch-certificate-issue', __upload.single("excelFile"), adminController.batchIssueCertificate);
+router.post('/batch-certificate-issue', __upload.single("excelFile"), ensureAuthenticated, adminController.batchIssueCertificate);
 
 /**
  * @swagger
@@ -920,7 +920,7 @@ router.post('/batch-certificate-issue', __upload.single("excelFile"), adminContr
  *               message: The service is temporarily unavailable due to insufficient credits. Please try again later.
  */
 
-router.post('/dynamic-batch-issue', upload.single("zipFile"), adminController.dynamicBatchIssueConcurrency);
+router.post('/dynamic-batch-issue', upload.single("zipFile"), ensureAuthenticated, adminController.dynamicBatchIssueConcurrency);
 // router.post('/dynamic-batch-issue', upload.single("zipFile"), adminController.dynamicBatchIssueCertificates);
 
 /**
