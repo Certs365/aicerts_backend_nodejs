@@ -45,15 +45,12 @@ const {
   verifyPDFDimensions, //Verify the uploading pdf template dimensions
   verifyDynamicPDFDimensions,
   calculateHash, // Function to calculate the hash of a file
-  cleanUploadFolder, // Function to clean up the upload folder
   isDBConnected, // Function to check if the database connection is established
-  insertUrlData,
   getCertificationStatus,
   isCertificationIdExisted,
   getContractAddress,
   getPdfDimensions,
   generateCustomFolder,
-  wipeUploadFolder,
   wipeSourceFolder,
   wipeSourceFile,
 } = require("../model/tasks"); // Importing functions from the '../model/tasks' module
@@ -951,14 +948,11 @@ const handleIssuePdfCertification = async (
       } else if (idExist.status != 1) {
         errorMessage = messageCode.msgUnauthIssuer;
       } else if (_result == false) {
-        // await cleanUploadFolder();
-        // Always delete the temporary file (if it exists)
-        if (fs.existsSync(pdfPath)) {
-          fs.unlinkSync(pdfPath);
-        }
         errorMessage = messageCode.msgInvalidPdfTemplate;
       }
 
+      // Always delete the temporary file (if it exists)
+      await wipeSourceFile(pdfPath);
       // Respond with error message
       return {
         code: 400,
@@ -995,9 +989,7 @@ const handleIssuePdfCertification = async (
         let getContractStatus = await getContractAddress(contractAddress);
         if (!getContractStatus) {
           // Always delete the temporary file (if it exists)
-          if (fs.existsSync(pdfPath)) {
-            fs.unlinkSync(pdfPath);
-          }
+          await wipeSourceFile(pdfPath);
           return {
             code: 400,
             status: "FAILED",
@@ -1009,6 +1001,7 @@ const handleIssuePdfCertification = async (
         let isPaused = await newContract.paused();
         // Check if the Issuer wallet address is a valid Ethereum address
         if (!ethers.isAddress(idExist.issuerId)) {
+          await wipeSourceFile(pdfPath);
           return {
             code: 400,
             status: "FAILED",
@@ -1047,6 +1040,7 @@ const handleIssuePdfCertification = async (
           } else if (issuerAuthorized === false) {
             messageContent = messageCode.msgIssuerUnauthrized;
           }
+          await wipeSourceFile(pdfPath);
           return {
             code: 400,
             status: "FAILED",
@@ -1057,6 +1051,7 @@ const handleIssuePdfCertification = async (
       } catch (error) {
         // Handle mongoose connection error (log it, response an error, etc.)
         console.error("Internal server error", error);
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: "FAILED",
@@ -1071,6 +1066,7 @@ const handleIssuePdfCertification = async (
         epochExpiration
       );
       if (!txHash) {
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: false,
@@ -1089,7 +1085,6 @@ const handleIssuePdfCertification = async (
         };
         const urlLink = await generateEncryptedUrl(dataWithLink);
         const legacyQR = false;
-        let shortUrlStatus = false;
         let modifiedUrl;
 
         let qrCodeData = "";
@@ -1106,25 +1101,9 @@ const handleIssuePdfCertification = async (
           qrCodeData = urlLink;
         }
 
-        // if (urlLink) {
-        //   let dbStatus = await isDBConnected();
-        //   if (dbStatus) {
-        //     const urlData = {
-        //       email: email,
-        //       certificateNumber: certificateNumber,
-        //       url: urlLink
-        //     }
-        //     await insertUrlData(urlData);
-        //     shortUrlStatus = true;
-        //   }
-        // }
-
-        // if (shortUrlStatus) {
         modifiedUrl = process.env.SHORT_URL + certificateNumber;
-        // }
 
         let _qrCodeData = modifiedUrl != false ? modifiedUrl : qrCodeData;
-        // console.log("Short URL", _qrCodeData);
 
         if (idExist.qrPreference) {
           qrOption = idExist.qrPreference;
@@ -1146,6 +1125,7 @@ const handleIssuePdfCertification = async (
         var outputPdf = `${fields.Certificate_Number}${name}.pdf`;
         var { width, height } = await getPdfDimensions(pdfPath);
         if (!fs.existsSync(pdfPath)) {
+          await wipeSourceFile(pdfPath);
           return {
             code: 400,
             status: "FAILED",
@@ -1165,6 +1145,7 @@ const handleIssuePdfCertification = async (
         // Read the generated PDF file
         var fileBuffer = fs.readFileSync(outputPdf);
       } catch (error) {
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: "FAILED",
@@ -1182,6 +1163,7 @@ const handleIssuePdfCertification = async (
       );
 
       if (!imageUrl) {
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: "FAILED",
@@ -1234,6 +1216,7 @@ const handleIssuePdfCertification = async (
       } catch (error) {
         // Handle mongoose connection error (log it, response an error, etc.)
         console.error("Internal server error", error);
+        await wipeSourceFile(pdfPath);
         return {
           code: 500,
           status: "FAILED",
@@ -1245,6 +1228,7 @@ const handleIssuePdfCertification = async (
   } catch (error) {
     // Handle mongoose connection error (log it, response an error, etc.)
     console.error("Internal server error", error);
+    await wipeSourceFile(pdfPath);
     return {
       code: 400,
       status: "FAILED",
@@ -1276,6 +1260,7 @@ const handleIssueDynamicPdfCertification = async (
     const idExist = await isValidIssuer(email);
 
     if (!idExist) {
+      await wipeSourceFile(pdfPath);
       return {
         code: 400,
         status: "FAILED",
@@ -1297,7 +1282,7 @@ const handleIssueDynamicPdfCertification = async (
         issueDate: issuedDate,
         certificateStatus: _certStatus,
       };
-      await wipeSourceFile(_pdfPath);
+      await wipeSourceFile(pdfPath);
       return {
         code: 400,
         status: "FAILED",
@@ -1307,13 +1292,6 @@ const handleIssueDynamicPdfCertification = async (
     }
 
     let _result = "";
-    // let templateData = await extractQRCodeDataFromPDF(pdfPath)
-    //   .then(result => {
-    //     _result = result;
-    //   })
-    //   .catch(error => {
-    //     console.error("Error during verification:", error);
-    //   });
 
     let templateData = await verifyDynamicPDFDimensions(pdfPath, _qrsize)
       .then((result) => {
@@ -1340,9 +1318,8 @@ const handleIssueDynamicPdfCertification = async (
         } else {
           errorMessage = messageCode.msgInvalidPdfQr;
         }
-        await wipeSourceFile(_pdfPath);
       }
-
+      await wipeSourceFile(pdfPath);
       // Respond with error message
       return {
         code: 400,
@@ -1366,9 +1343,7 @@ const handleIssueDynamicPdfCertification = async (
       try {
         let getContractStatus = await getContractAddress(contractAddress);
         if (!getContractStatus) {
-          if (fs.existsSync(_pdfPath)) {
-            fs.unlinkSync(_pdfPath);
-          }
+          await wipeSourceFile(pdfPath);
           return {
             code: 400,
             status: "FAILED",
@@ -1380,6 +1355,7 @@ const handleIssueDynamicPdfCertification = async (
         let isPaused = await newContract.paused();
         // Check if the Issuer wallet address is a valid Ethereum address
         if (!ethers.isAddress(idExist.issuerId)) {
+          await wipeSourceFile(pdfPath);
           return {
             code: 400,
             status: "FAILED",
@@ -1418,6 +1394,7 @@ const handleIssueDynamicPdfCertification = async (
           } else if (issuerAuthorized === false) {
             messageContent = messageCode.msgIssuerUnauthrized;
           }
+          await wipeSourceFile(pdfPath);
           return {
             code: 400,
             status: "FAILED",
@@ -1428,6 +1405,7 @@ const handleIssueDynamicPdfCertification = async (
       } catch (error) {
         // Handle mongoose connection error (log it, response an error, etc.)
         console.error("Internal server error", error);
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: "FAILED",
@@ -1442,6 +1420,7 @@ const handleIssueDynamicPdfCertification = async (
         1
       );
       if (!txHash) {
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: false,
@@ -1475,26 +1454,9 @@ const handleIssueDynamicPdfCertification = async (
           // Directly include the URL in QR code
           qrCodeData = urlLink;
         }
-
-        // if (urlLink) {
-        //   let dbStatus = await isDBConnected();
-        //   if (dbStatus) {
-        //     const urlData = {
-        //       email: email,
-        //       certificateNumber: certificateNumber,
-        //       url: urlLink
-        //     }
-        //     await insertUrlData(urlData);
-        //     shortUrlStatus = true;
-        //   }
-        // }
-
-        // if (shortUrlStatus) {
         modifiedUrl = process.env.SHORT_URL + certificateNumber;
-        // }
 
         let _qrCodeData = modifiedUrl != false ? modifiedUrl : qrCodeData;
-        // console.log("Short URL", _qrCodeData);
 
         if (idExist.qrPreference) {
           qrOption = idExist.qrPreference;
@@ -1533,6 +1495,7 @@ const handleIssueDynamicPdfCertification = async (
         // Read the generated PDF file
         var fileBuffer = fs.readFileSync(outputPdf);
       } catch (error) {
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: "FAILED",
@@ -1550,6 +1513,7 @@ const handleIssueDynamicPdfCertification = async (
       );
 
       if (!imageUrl) {
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: "FAILED",
@@ -1588,26 +1552,17 @@ const handleIssueDynamicPdfCertification = async (
         await insertDynamicCertificateData(certificateData);
 
         // Delete files
-        if (fs.existsSync(outputPdf)) {
-          // Delete the specified file
-          fs.unlinkSync(outputPdf);
-        }
+        await wipeSourceFile(outputPdf);
 
         // Always delete the temporary file (if it exists)
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-        }
-
-        // await cleanUploadFolder();
+        await wipeSourceFile(pdfPath);
 
         // Set response headers for PDF download
         return { code: 200, file: fileBuffer };
       } catch (error) {
         // Handle mongoose connection error (log it, response an error, etc.)
         console.error("Internal server error", error);
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-        }
+        await wipeSourceFile(pdfPath);
         return {
           code: 500,
           status: "FAILED",
@@ -1619,9 +1574,7 @@ const handleIssueDynamicPdfCertification = async (
   } catch (error) {
     // Handle mongoose connection error (log it, response an error, etc.)
     console.error("Internal server error", error);
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    await wipeSourceFile(pdfPath);
     return {
       code: 400,
       status: "FAILED",
@@ -1678,6 +1631,7 @@ const handleIssueDynamicCertification = async (
     } else if (epochExpiration != 1 && epochExpiration < validExpiration) {
       errorMessage = `${expirationDate} - ${messageCode.msgInvalidExpiration}`;
     }
+    await wipeSourceFile(pdfPath);
     return { code: 400, status: "FAILED", message: errorMessage };
   }
   try {
@@ -1707,7 +1661,7 @@ const handleIssueDynamicCertification = async (
         issueDate: issuedDate,
         certificateStatus: _certStatus,
       };
-      await wipeSourceFile(_pdfPath);
+      await wipeSourceFile(pdfPath);
       return {
         code: 400,
         status: "FAILED",
@@ -1717,13 +1671,6 @@ const handleIssueDynamicCertification = async (
     }
 
     let _result = "";
-    // let templateData = await extractQRCodeDataFromPDF(pdfPath)
-    //   .then(result => {
-    //     _result = result;
-    //   })
-    //   .catch(error => {
-    //     console.error("Error during verification:", error);
-    //   });
 
     let templateData = await verifyDynamicPDFDimensions(pdfPath, _qrsize)
       .then((result) => {
@@ -1750,9 +1697,9 @@ const handleIssueDynamicCertification = async (
         } else {
           errorMessage = messageCode.msgInvalidPdfQr;
         }
-        await wipeSourceFile(_pdfPath);
       }
 
+      await wipeSourceFile(pdfPath);
       // Respond with error message
       return {
         code: 400,
@@ -1778,9 +1725,7 @@ const handleIssueDynamicCertification = async (
       try {
         let getContractStatus = await getContractAddress(contractAddress);
         if (!getContractStatus) {
-          if (fs.existsSync(_pdfPath)) {
-            fs.unlinkSync(_pdfPath);
-          }
+          await wipeSourceFile(pdfPath);
           return {
             code: 400,
             status: "FAILED",
@@ -1792,6 +1737,7 @@ const handleIssueDynamicCertification = async (
         let isPaused = await newContract.paused();
         // Check if the Issuer wallet address is a valid Ethereum address
         if (!ethers.isAddress(idExist.issuerId)) {
+          await wipeSourceFile(pdfPath);
           return {
             code: 400,
             status: "FAILED",
@@ -1830,6 +1776,7 @@ const handleIssueDynamicCertification = async (
           } else if (issuerAuthorized === false) {
             messageContent = messageCode.msgIssuerUnauthrized;
           }
+          await wipeSourceFile(pdfPath);
           return {
             code: 400,
             status: "FAILED",
@@ -1840,6 +1787,7 @@ const handleIssueDynamicCertification = async (
       } catch (error) {
         // Handle mongoose connection error (log it, response an error, etc.)
         console.error("Internal server error", error);
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: "FAILED",
@@ -1854,6 +1802,7 @@ const handleIssueDynamicCertification = async (
         epochExpiration
       );
       if (!txHash) {
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: false,
@@ -1890,25 +1839,9 @@ const handleIssueDynamicCertification = async (
           qrCodeData = urlLink;
         }
 
-        // if (urlLink) {
-        //   let dbStatus = await isDBConnected();
-        //   if (dbStatus) {
-        //     const urlData = {
-        //       email: email,
-        //       certificateNumber: certificateNumber,
-        //       url: urlLink
-        //     }
-        //     await insertUrlData(urlData);
-        //     shortUrlStatus = true;
-        //   }
-        // }
-
-        // if (shortUrlStatus) {
         modifiedUrl = process.env.SHORT_URL + certificateNumber;
-        // }
 
         let _qrCodeData = modifiedUrl != false ? modifiedUrl : qrCodeData;
-        // console.log("Short URL", _qrCodeData);
 
         if (idExist.qrPreference) {
           qrOption = idExist.qrPreference;
@@ -1947,6 +1880,7 @@ const handleIssueDynamicCertification = async (
         // Read the generated PDF file
         var fileBuffer = fs.readFileSync(outputPdf);
       } catch (error) {
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: "FAILED",
@@ -1964,6 +1898,7 @@ const handleIssueDynamicCertification = async (
       );
 
       if (!imageUrl) {
+        await wipeSourceFile(pdfPath);
         return {
           code: 400,
           status: "FAILED",
@@ -2007,26 +1942,17 @@ const handleIssueDynamicCertification = async (
         await insertCertificateData(certificateData);
 
         // Delete files
-        if (fs.existsSync(outputPdf)) {
-          // Delete the specified file
-          fs.unlinkSync(outputPdf);
-        }
+        await wipeSourceFile(outputPdf);
 
         // Always delete the temporary file (if it exists)
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-        }
-
-        // await cleanUploadFolder();
+        await wipeSourceFile(pdfPath);
 
         // Set response headers for PDF download
         return { code: 200, file: fileBuffer };
       } catch (error) {
         // Handle mongoose connection error (log it, response an error, etc.)
         console.error("Internal server error", error);
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-        }
+        await wipeSourceFile(pdfPath);
         return {
           code: 500,
           status: "FAILED",
@@ -2038,9 +1964,7 @@ const handleIssueDynamicCertification = async (
   } catch (error) {
     // Handle mongoose connection error (log it, response an error, etc.)
     console.error("Internal server error", error);
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    await wipeSourceFile(pdfPath);
     return {
       code: 400,
       status: "FAILED",
@@ -2475,7 +2399,7 @@ const dynamicBatchCertificates = async (
 
   try {
     // Check if the directory exists, if not, create it
-    const destDirectory = path.join(__dirname, "../../uploads/" ,customFolder, "completed");
+    const destDirectory = path.join(__dirname, "../../uploads/", customFolder, "completed");
     console.log("Present working directory", __dirname, destDirectory);
 
     if (bulkIssueStatus == "ZIP_STORE" || flag == 1) {

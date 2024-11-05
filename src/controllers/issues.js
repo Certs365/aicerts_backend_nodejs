@@ -54,11 +54,8 @@ const {
   convertDateToEpoch,
   insertBatchCertificateData, // Function to insert Batch certificate data into the database
   calculateHash, // Function to calculate the hash of a file
-  cleanUploadFolder, // Function to clean up the upload folder
   isDBConnected, // Function to check if the database connection is established
   insertUrlData,
-  flushUploadFolder,
-  wipeUploadFolder,
   getIssuerServiceCredits,
   updateIssuerServiceCredits,
   validatePDFDimensions,
@@ -66,6 +63,7 @@ const {
   generateCustomFolder,
   wipeSourceFolder,
   wipeSourceFile,
+  renameUploadPdfFile,
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
 
 const { fetchOrEstimateTransactionFee } = require('../utils/upload');
@@ -99,6 +97,8 @@ const cert_limit = parseInt(process.env.BATCH_LIMIT);
 // const currentDir = __dirname;
 // const parentDir = path.dirname(path.dirname(currentDir));
 const fileType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"; // File type
+// Define allowed Excel file extensions
+const allowedExtensions = ['.xls', '.xlsx'];
 
 var existIssuerId;
 
@@ -118,12 +118,16 @@ const issuePdf = async (req, res) => {
   const pdfDoc = await PDFDocument.load(fileBuffer);
   let _expirationDate;
 
+  // Rename the file by replacing the original file path with the new file name
+  const newFilePath = await renameUploadPdfFile(file.path);
+
+  console.log("The file name", req.file.path, newFilePath);
+  if (newFilePath) {
+    // Update req.file.path to reflect the new file path
+    req.file.path = newFilePath;
+  }
+
   if (pdfDoc.getPageCount() > 1) {
-    // Respond with success status and certificate details
-    // await cleanUploadFolder();
-    // if (fs.existsSync(file)) {
-    //   fs.unlinkSync(file);
-    // }
     // Delete the source file
     await wipeSourceFile(req.file.path);
     return res.status(400).json({ status: "FAILED", message: messageCode.msgMultiPagePdf });
@@ -145,13 +149,16 @@ const issuePdf = async (req, res) => {
           existIssuerId = issuerExist.issuerId;
           let fetchCredits = await getIssuerServiceCredits(existIssuerId, 'issue');
           if (fetchCredits === true) {
+            await wipeSourceFile(req.file.path);
             return res.status(503).json({ status: "FAILED", message: messageCode.msgIssuerQuotaStatus });
           }
           if (fetchCredits) {
           } else {
+            await wipeSourceFile(req.file.path);
             return res.status(503).json({ status: "FAILED", message: messageCode.msgIssuerQuotaExceeded });
           }
         } else {
+          await wipeSourceFile(req.file.path);
           return res.status(400).json({ status: "FAILED", message: messageCode.msgInvalidIssuerId });
         }
       }
@@ -191,11 +198,13 @@ const issuePdf = async (req, res) => {
       return;
 
     } else {
+      await wipeSourceFile(req.file.path);
       return res.status(issueResponse.code).json({ status: issueResponse.status, message: issueResponse.message, details: responseDetails });
     }
 
   } catch (error) {
     // Handle any errors that occur during token verification or validation
+    await wipeSourceFile(req.file.path);
     return res.status(500).json({ status: "FAILED", message: messageCode.msgInternalError });
   }
 };
@@ -214,14 +223,19 @@ const issueDynamicPdf = async (req, res) => {
   var file = req?.file;
   const fileBuffer = fs.readFileSync(req.file.path);
   const pdfDoc = await PDFDocument.load(fileBuffer);
-  let _expirationDate;
+
+  // Rename the file by replacing the original file path with the new file name
+  const newFilePath = await renameUploadPdfFile(file.path);
+  console.log("The file name", req.file.path, newFilePath);
+
+  if (newFilePath) {
+    // Update req.file.path to reflect the new file path
+    req.file.path = newFilePath;
+  }
 
   if (pdfDoc.getPageCount() > 1) {
-    // Respond with success status and certificate details
-    // await cleanUploadFolder();
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    // Delete the source file
+    await wipeSourceFile(req.file.path);
     return res.status(400).json({ status: "FAILED", message: messageCode.msgMultiPagePdf });
   }
   try {
@@ -252,13 +266,16 @@ const issueDynamicPdf = async (req, res) => {
           existIssuerId = issuerExist.issuerId;
           let fetchCredits = await getIssuerServiceCredits(existIssuerId, 'issue');
           if (fetchCredits === true) {
+            await wipeSourceFile(req.file.path);
             return res.status(503).json({ status: "FAILED", message: messageCode.msgIssuerQuotaStatus });
           }
           if (fetchCredits) {
           } else {
+            await wipeSourceFile(req.file.path);
             return res.status(503).json({ status: "FAILED", message: messageCode.msgIssuerQuotaExceeded });
           }
         } else {
+          await wipeSourceFile(req.file.path);
           return res.status(400).json({ status: "FAILED", message: messageCode.msgInvalidIssuerId });
         }
       }
@@ -283,11 +300,13 @@ const issueDynamicPdf = async (req, res) => {
       return;
 
     } else {
+      await wipeSourceFile(req.file.path);
       return res.status(issueResponse.code).json({ status: issueResponse.status, message: issueResponse.message, details: responseDetails });
     }
 
   } catch (error) {
     // Handle any errors that occur during token verification or validation
+    await wipeSourceFile(req.file.path);
     return res.status(500).json({ status: "FAILED", message: messageCode.msgInternalError });
   }
 };
@@ -382,6 +401,15 @@ const issueDynamicCredential = async (req, res) => {
   var issueResponse;
   var credentialNumber;
 
+  // Rename the file by replacing the original file path with the new file name
+  const newFilePath = await renameUploadPdfFile(file.path);
+  console.log("The file name", req.file.path, newFilePath);
+
+  if (newFilePath) {
+    // Update req.file.path to reflect the new file path
+    req.file.path = newFilePath;
+  }
+
   if (flag != 1 && flag != 0) {
     return res.status(400).json({ status: "FAILED", message: messageCode.msgInvalidFlag });
   }
@@ -424,19 +452,46 @@ const issueDynamicCredential = async (req, res) => {
             existIssuerId = issuerExist.issuerId;
             let fetchCredits = await getIssuerServiceCredits(existIssuerId, 'issue');
             if (fetchCredits === true) {
+              await wipeSourceFile(req.file.path);
               return res.status(503).json({ status: "FAILED", message: messageCode.msgIssuerQuotaStatus });
             }
             if (fetchCredits) {
             } else {
+              await wipeSourceFile(req.file.path);
               return res.status(503).json({ status: "FAILED", message: messageCode.msgIssuerQuotaExceeded });
             }
           } else {
+            await wipeSourceFile(req.file.path);
             return res.status(400).json({ status: "FAILED", message: messageCode.msgInvalidIssuerId });
           }
         }
       }
 
       issueResponse = await handleIssueDynamicPdfCertification(email, certificateNumber, certificateName, customFields, req.file.path, _positionX, _positionY, _qrsize);
+
+      const responseDetails = issueResponse.details ? issueResponse.details : '';
+      if (issueResponse.code == 200) {
+        // Update Issuer credits limit (decrease by 1)
+        await updateIssuerServiceCredits(existIssuerId, 'issue');
+
+        // Set response headers for PDF to download
+        const certificateName = `${certificateNumber}_credential.pdf`;
+
+        res.set({
+          'Content-Type': "application/pdf",
+          'Content-Disposition': `attachment; filename="${certificateName}"`, // Change filename as needed
+        });
+
+        // Send Pdf file
+        res.send(issueResponse.file);
+        await wipeSourceFile(req.file.path);
+        return;
+
+      } else {
+        await wipeSourceFile(req.file.path);
+        return res.status(issueResponse.code).json({ status: issueResponse.status, message: issueResponse.message, details: responseDetails });
+      }
+
     } else if (flag == 1) {
       // Extracting required data from the request body
       let email = req.body.email;
@@ -466,13 +521,16 @@ const issueDynamicCredential = async (req, res) => {
             existIssuerId = issuerExist.issuerId;
             let fetchCredits = await getIssuerServiceCredits(existIssuerId, 'issue');
             if (fetchCredits === true) {
+              await wipeSourceFile(req.file.path);
               return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaStatus });
             }
             if (fetchCredits) {
             } else {
+              await wipeSourceFile(req.file.path);
               return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaExceeded });
             }
           } else {
+            await wipeSourceFile(req.file.path);
             return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuerId });
           }
         }
@@ -494,13 +552,9 @@ const issueDynamicCredential = async (req, res) => {
       }
 
       issueResponse = await handleIssueDynamicCertification(email, certificateNumber, name, courseName, _grantDate, _expirationDate, req.file.path, _positionX, _positionY, _qrsize);
-
-    } else {
-      return res.status(400).json({ status: "FAILED", message: messageCode.msgInvalidFlag });
-    }
-    const responseDetails = issueResponse.details ? issueResponse.details : '';
-    if (issueResponse.code == 200) {
-      // Update Issuer credits limit (decrease by 1)
+      const responseDetails = issueResponse.details ? issueResponse.details : '';
+      if (issueResponse.code == 200) {
+        // Update Issuer credits limit (decrease by 1)
       await updateIssuerServiceCredits(existIssuerId, 'issue');
 
       // Set response headers for PDF to download
@@ -513,14 +567,21 @@ const issueDynamicCredential = async (req, res) => {
 
       // Send Pdf file
       res.send(issueResponse.file);
+      await wipeSourceFile(req.file.path);
       return;
-
+  
+      } else {
+        await wipeSourceFile(req.file.path);
+        return res.status(issueResponse.code).json({ status: issueResponse.status, message: issueResponse.message, details: responseDetails });
+      }
     } else {
-      return res.status(issueResponse.code).json({ status: issueResponse.status, message: issueResponse.message, details: responseDetails });
+      await wipeSourceFile(req.file.path);
+      return res.status(400).json({ status: "FAILED", message: messageCode.msgInvalidFlag });
     }
 
   } catch (error) {
     // Handle any errors that occur during token verification or validation
+    await wipeSourceFile(req.file.path);
     return res.status(500).json({ status: "FAILED", message: messageCode.msgInternalError });
   }
 };
@@ -594,13 +655,21 @@ const batchIssueCertificate = async (req, res) => {
   var file = req?.file;
   // Check if the file path matches the pattern
   if (req.file.mimetype != fileType) {
-    // File path does not match the pattern
-    const errorMessage = messageCode.msgMustExcel;
-    // await cleanUploadFolder();
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
-    res.status(400).json({ code: 400, status: "FAILED", message: errorMessage });
+    // Delete the source file
+    await wipeSourceFile(file.path);
+    res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgMustExcel });
+    return;
+  }
+
+  // Get the file extension
+  const fileExtension = path.extname(req.file.originalname).toLowerCase();
+
+  console.log("The input file details:", req.file.originalname, file.path, fileExtension);
+  // Check if the file extension is in the allowed list
+  if (!allowedExtensions.includes(fileExtension)) {
+    // Delete the source file
+    await wipeSourceFile(file.path);
+    res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgMustExcel });
     return;
   }
 
@@ -613,13 +682,16 @@ const batchIssueCertificate = async (req, res) => {
         existIssuerId = issuerExist.issuerId;
         let fetchCredits = await getIssuerServiceCredits(existIssuerId, 'issue');
         if (fetchCredits === true) {
+          await wipeSourceFile(file.path);
           return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaStatus });
         }
         if (fetchCredits) {
         } else {
+          await wipeSourceFile(file.path);
           return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaExceeded });
         }
       } else {
+        await wipeSourceFile(file.path);
         return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuerId });
       }
     }
@@ -658,7 +730,7 @@ const batchIssueCertificate = async (req, res) => {
         } else if (idExist.status !== 1) {
           errorMessage = messageCode.msgUnauthIssuer;
         }
-
+        await wipeSourceFile(file.path);
         res.status(400).json({ code: 400, status: "FAILED", message: errorMessage, details: _details });
         return;
 
@@ -712,6 +784,7 @@ const batchIssueCertificate = async (req, res) => {
           const isPaused = await newContract.paused();
           // Check if the Issuer wallet address is a valid Ethereum address
           if (!ethers.isAddress(idExist.issuerId)) {
+            await wipeSourceFile(file.path);
             return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidEthereum });
           }
           const issuerAuthorized = await newContract.hasRole(process.env.ISSUER_ROLE, idExist.issuerId);
@@ -723,7 +796,7 @@ const batchIssueCertificate = async (req, res) => {
             if (issuerAuthorized === flase) {
               messageContent = messageCode.msgIssuerUnauthrized;
             }
-
+            await wipeSourceFile(file.path);
             return res.status(400).json({ code: 400, status: "FAILED", message: messageContent });
           }
 
@@ -742,6 +815,7 @@ const batchIssueCertificate = async (req, res) => {
 
           let { txHash, txFee } = await issueBatchCertificateWithRetry(tree.root, dateEntry);
           if (!txHash) {
+            await wipeSourceFile(file.path);
             return ({ code: 400, status: false, message: messageCode.msgFaileToIssueAfterRetry, details: certificateNumber });
           }
 
@@ -873,28 +947,30 @@ const batchIssueCertificate = async (req, res) => {
               details: batchDetailsWithQR,
             });
 
-            // await cleanUploadFolder();
-            if (fs.existsSync(file)) {
-              fs.unlinkSync(file);
-            }
+            await wipeSourceFile(file.path);
+            return;
 
           } catch (error) {
             // Handle mongoose connection error (log it, response an error, etc.)
             console.error(messageCode.msgInternalError, error);
+            await wipeSourceFile(file.path);
             return res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
           }
 
         } catch (error) {
           console.error('Error:', error);
+          await wipeSourceFile(file.path);
           return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgFailedAtBlockchain, details: error });
         }
       }
     } catch (error) {
       console.error('Error:', error);
+      await wipeSourceFile(file.path);
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidExcel, details: error });
     }
   } catch (error) {
     console.error('Error:', error);
+    await wipeSourceFile(file.path);
     return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
   }
 };
@@ -1031,11 +1107,11 @@ const dynamicBatchIssueCertificates = async (req, res) => {
     // Delete the source zip file after extraction
     await wipeSourceFile(filePath);
 
-    let zipExist = await findDirectories(filesList);
+    let zipExist = await _findDirectories(filesList, customFolderName);
     if (zipExist) {
       filesList = zipExist;
     }
-    console.log("files", filesList, filesList.length);
+    console.log("Unzip response", filesList, filesList.length);
 
     if (filesList.length < 2) {
       res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgUnableToFindFiles });
@@ -1164,9 +1240,9 @@ const dynamicBatchIssueCertificates = async (req, res) => {
 
     console.log("The queue option", queueOption);
     if (queueOption == 0) {
-      bulkIssueResponse = await dynamicBulkCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, flag);
+      bulkIssueResponse = await dynamicBulkCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
     } else {
-      bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, flag);
+      bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
     }
 
     if ((bulkIssueStatus == 'ZIP_STORE' && queueOption == 0) || (flag == 1 && queueOption == 0)) {
@@ -1240,6 +1316,13 @@ const dynamicBatchIssueCertificates = async (req, res) => {
         let uploadPath = path.join(__dirname, '../../uploads', customFolderName);
         let files = fs.readdirSync(uploadPath);
         console.log("Files remain", files);
+        // await flushUploadFolder();
+        // await removeEmptyFolders(uploadPath);
+        // let ifFileExist = path.join(uploadPath, file.filename);
+        // console.log("The file", file, ifFileExist);
+        // if (fs.existsSync(ifFileExist)) {
+        //   fs.unlinkSync(ifFileExist);
+        // }
         await wipeSourceFolder(customFolderName);
         return;
       } else {
@@ -1276,7 +1359,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
 
   } catch (error) {
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
-    await wipeSourceFolder(customFolderName);
+    // await wipeSourceFolder(customFolderName);
     return;
   }
 };
@@ -1464,7 +1547,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
       queueOption = 0;
     }
 
-    excelData = await handleBatchExcelFile(excelFilePath);
+    excelData = await handleBatchExcelFile(excelFilePath, issuerExist);
 
     // await _fs.remove(filePath);
     if (excelData.response == false) {
@@ -1495,7 +1578,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
         let targetDocument = pdfFiles[index];
 
         // Construct the PDF file path
-        let pdfFilePath = path.join(__dirname, '../../uploads', targetDocument);
+        let pdfFilePath = path.join(__dirname, '../../uploads', customFolderName, targetDocument);
 
         let templateBuffer = fs.readFileSync(pdfFilePath);
         let pdfDoc = await PDFDocument.load(templateBuffer);
@@ -1531,7 +1614,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
       return;
     }
 
-    bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, flag);
+    bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
 
     if (bulkIssueStatus == 'ZIP_STORE' || flag == 1) {
       if (bulkIssueResponse.code == 200) {
@@ -1647,7 +1730,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
 
   } catch (error) {
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
-    await wipeSourceFolder(customFolderName);
+    // await wipeSourceFolder(customFolderName);
     return;
   }
 };
@@ -2032,7 +2115,7 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
 
   } catch (error) {
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
-    await wipeSourceFolder(customFolderName);
+    // await wipeSourceFolder(customFolderName);
     return;
   }
 };

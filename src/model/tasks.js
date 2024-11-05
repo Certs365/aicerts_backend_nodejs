@@ -1626,7 +1626,26 @@ const wipeSourceFile = async (_path) => {
   }
 };
 
+// Function to rename upload PDF file
+const renameUploadPdfFile = async (oldFilePath) => {
+  if (!oldFilePath) {
+    return null;
+  }
+  try {
+    // Define a new file name, keeping the same directory path as the original file
+    let getRandomId = Math.floor(10000 + Math.random() * 90000);
+    let newFileName = `${getRandomId}_${Date.now()}.pdf`;
+    let directoryPath = path.dirname(oldFilePath);
+    let newFilePath = path.join(directoryPath, newFileName);
 
+    // Rename the file by replacing the original file path with the new file name
+    fs.renameSync(oldFilePath, newFilePath);
+    return newFilePath;
+  } catch (error) {
+    console.error("Error occuered while renaming PDF file", error);
+    return null;
+  }
+}
 
 const isDBConnected = async (maxRetries = 5, retryDelay = 1500) => {
   let retryCount = 0;
@@ -1974,6 +1993,8 @@ module.exports = {
   wipeUploadFolder,
   wipeSourceFolder,
   wipeSourceFile,
+
+  renameUploadPdfFile,
 
   // Function to check if MongoDB is connected
   isDBConnected,
