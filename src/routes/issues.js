@@ -944,9 +944,6 @@ router.post('/dynamic-batch-issue', upload.single("zipFile"), ensureAuthenticate
  *                 type: string
  *                 format: binary
  *                 description: ZIP file containing the PDF certificates & Excel to be issued.
- *               flag:
- *                 type: number
- *                 description: Provide flag for download option 0:S3 JSON Response, 1:Zip response.
  *             required:
  *                - email
  *                - zipFile

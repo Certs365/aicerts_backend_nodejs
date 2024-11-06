@@ -1468,6 +1468,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
     }
     // Create a readable stream from the zip file
     const readStream = fs.createReadStream(filePath);
+    
     const uploadsPath = path.join(__dirname, "../../uploads");
     const updatedDestinationPath = path.join(__dirname, "../../uploads", customFolderName);
     destDirectory = path.join(__dirname, "../../uploads", customFolderName, "completed");
@@ -2583,7 +2584,6 @@ module.exports = {
   issueDynamicPdf,
 
   issueDynamicCredential,
-  dynamicBatchIssueCredentials,
 
   // Function to issue a certification
   issue,
@@ -2594,6 +2594,7 @@ module.exports = {
   // Function to issue a Dynamic Bulk issues (batch) of certifications
   dynamicBatchIssueCertificates,
   dynamicBatchIssueConcurrency,
+  dynamicBatchIssueCredentials,
 
   // Function to accept pdf & qr dimensions  Batch of certifications
   acceptDynamicInputs,
