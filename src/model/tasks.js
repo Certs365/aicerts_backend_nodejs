@@ -1549,6 +1549,65 @@ const cleanUploadFolder = async () => {
   }
 };
 
+// Function to delete all empty folders (in provided path)
+const removeEmptyFolders = async (dir) => {
+  try {
+    // Read the contents of the directory
+    const files = fs.readdirSync(dir);
+
+    // Loop through each file and directory
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      const stats = fs.statSync(filePath);
+
+      // If it's a directory, recursively check for empty folders
+      if (stats.isDirectory()) {
+        await removeEmptyFolders(filePath); // Recursive call
+
+        // Recheck if the folder is empty after processing subdirectories
+        if (fs.existsSync(filePath) && fs.readdirSync(filePath).length === 0) {
+          fs.rmdirSync(filePath);
+          console.log(`Removed empty folder: ${filePath}`);
+        }
+      }
+    }
+
+    // Finally, check if the root directory itself is empty
+    if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) {
+      fs.rmdirSync(dir);
+      console.log(`Removed root empty folder: ${dir}`);
+    }
+
+  } catch (error) {
+    console.error(`Error removing folder ${dir}: ${error.message}`);
+  }
+};
+
+// Function to list down all existed pdf files in the given path (folder)
+const getPdfFiles = async (folderPath) => {
+  try {
+    // Initialize an array to store only PDF files
+    const pdfFilesList = [];
+
+    // Read all files in the specified folder
+    const files = fs.readdirSync(folderPath);
+
+    // Filter for files with .pdf extension and push them into the array
+    files.forEach(file => {
+      if (path.extname(file).toLowerCase() === '.pdf') {
+        pdfFilesList.push(file);
+      }
+    });
+
+    // Return the list of PDF files
+    return pdfFilesList;
+
+  } catch (err) {
+    console.error("Error reading directory:", err);
+    return [];
+  }
+}
+
 const flushUploadFolder = async () => {
   const uploadFolder = '../uploads'; // Specify the folder path you want
   const folderPath = path.join(__dirname, '..', uploadFolder);
@@ -1995,6 +2054,10 @@ module.exports = {
   wipeSourceFile,
 
   renameUploadPdfFile,
+
+  removeEmptyFolders,
+
+  getPdfFiles,
 
   // Function to check if MongoDB is connected
   isDBConnected,

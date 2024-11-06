@@ -2256,14 +2256,10 @@ const dynamicBulkCertificates = async (
           }
 
           // Always delete the source files (if it exists)
-          // if (fs.existsSync(file)) {
-          //   fs.unlinkSync(file);
-          // }
+          await wipeSourceFile(file);
 
           // Always delete the source files (if it exists)
-          if (fs.existsSync(outputPdf)) {
-            fs.unlinkSync(outputPdf);
-          }
+          await wipeSourceFile(outputPdf);
 
           if (bulkIssueStatus == "ZIP_STORE" || flag == 1) {
             fs.writeFileSync(outputPath, fileBuffer);

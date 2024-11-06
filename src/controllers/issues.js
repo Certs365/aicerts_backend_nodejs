@@ -29,7 +29,7 @@ const { User, Issues, BatchIssues, DynamicParameters, DynamicBatchIssues } = req
 // Import ABI (Application Binary Interface) from the JSON file located at "../config/abi.json"
 const abi = require("../config/abi.json");
 
-const extractionPath = './uploads';
+const extractionPath = path.join(__dirname, "../../uploads");
 
 const bulkIssueStatus = process.env.BULK_ISSUE_STATUS || 'DEFAULT';
 const cloudStore = process.env.CLOUD_STORE || 'DEFAULT';
@@ -64,6 +64,8 @@ const {
   wipeSourceFolder,
   wipeSourceFile,
   renameUploadPdfFile,
+  removeEmptyFolders,
+  getPdfFiles,
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
 
 const { fetchOrEstimateTransactionFee } = require('../utils/upload');
@@ -559,21 +561,21 @@ const issueDynamicCredential = async (req, res) => {
       const responseDetails = issueResponse.details ? issueResponse.details : '';
       if (issueResponse.code == 200) {
         // Update Issuer credits limit (decrease by 1)
-      await updateIssuerServiceCredits(existIssuerId, 'issue');
+        await updateIssuerServiceCredits(existIssuerId, 'issue');
 
-      // Set response headers for PDF to download
-      const certificateName = `${credentialNumber}_certificate.pdf`;
+        // Set response headers for PDF to download
+        const certificateName = `${credentialNumber}_certificate.pdf`;
 
-      res.set({
-        'Content-Type': "application/pdf",
-        'Content-Disposition': `attachment; filename="${certificateName}"`, // Change filename as needed
-      });
+        res.set({
+          'Content-Type': "application/pdf",
+          'Content-Disposition': `attachment; filename="${certificateName}"`, // Change filename as needed
+        });
 
-      // Send Pdf file
-      res.send(issueResponse.file);
-      await wipeSourceFile(req.file.path);
-      return;
-  
+        // Send Pdf file
+        res.send(issueResponse.file);
+        await wipeSourceFile(req.file.path);
+        return;
+
       } else {
         await wipeSourceFile(req.file.path);
         return res.status(issueResponse.code).json({ status: issueResponse.status, message: issueResponse.message, details: responseDetails });
@@ -1064,6 +1066,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
         messageContent = messageCode.msgInvalidParams;
       }
       res.status(400).json({ code: 400, status: "FAILED", message: messageContent, details: email });
+      await wipeSourceFile(req.file.path);
       return;
     }
 
@@ -1085,9 +1088,12 @@ const dynamicBatchIssueCertificates = async (req, res) => {
     }
     // Create a readable stream from the zip file
     const readStream = fs.createReadStream(filePath);
-    const updatedDestinationPath = path.join(extractionPath, customFolderName);
-    destDirectory = path.join(__dirname, "../../uploads", updatedDestinationPath, "completed");
+    const uploadsPath = path.join(__dirname, "../../uploads");
+    const updatedDestinationPath = path.join(__dirname, "../../uploads", customFolderName);
+    destDirectory = path.join(__dirname, "../../uploads", customFolderName, "completed");
     console.log("The updated folder", updatedDestinationPath);
+
+    await removeEmptyFolders(uploadsPath);
 
     if (fs.existsSync(destDirectory)) {
       // Delete the existing directory recursively
@@ -1095,7 +1101,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
     }
     // Pipe the read stream to the unzipper module for extraction
     await new Promise((resolve, reject) => {
-      readStream.pipe(unzipper.Extract({ path: extractionPath }))
+      readStream.pipe(unzipper.Extract({ path: updatedDestinationPath }))
         .on('error', err => {
           console.error('Error extracting zip file:', err);
           res.status(400).json({ status: "FAILED", message: messageCode.msgUnableToFindFiles, details: err });
@@ -1111,7 +1117,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
     // Delete the source zip file after extraction
     await wipeSourceFile(req.file.path);
 
-    let zipExist = await _findDirectories(filesList, customFolderName);
+    let zipExist = await findDirectories(filesList, customFolderName);
     if (zipExist) {
       filesList = zipExist;
     }
@@ -1300,13 +1306,16 @@ const dynamicBatchIssueCertificates = async (req, res) => {
 
         // Pipe the output stream to the zip archive
         archive.pipe(output);
+
+        var filesList = await getPdfFiles(destDirectory);
+
         var excelFileName = path.basename(excelFilePath);
         // Append the file to the list
-        pdfFiles.push(excelFileName);
+        filesList.push(excelFileName);
 
         // Add PDF files to the zip archive
-        pdfFiles.forEach(file => {
-          const filePath = path.join(destDirectory, file);
+        filesList.forEach(file => {
+          var filePath = path.join(destDirectory, file);
           archive.file(filePath, { name: file });
         });
 
@@ -1317,17 +1326,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
         if (fs.existsSync(excelFilePath)) {
           fs.unlinkSync(excelFilePath);
         }
-        let uploadPath = path.join(__dirname, '../../uploads', customFolderName);
-        let files = fs.readdirSync(uploadPath);
-        console.log("Files remain", files);
-        // await flushUploadFolder();
-        // await removeEmptyFolders(uploadPath);
-        // let ifFileExist = path.join(uploadPath, file.filename);
-        // console.log("The file", file, ifFileExist);
-        // if (fs.existsSync(ifFileExist)) {
-        //   fs.unlinkSync(ifFileExist);
-        // }
-        await wipeSourceFolder(customFolderName);
+
         return;
       } else {
         var statusCode = bulkIssueResponse.code || 400;
@@ -1363,7 +1362,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
 
   } catch (error) {
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
-    // await wipeSourceFolder(customFolderName);
+    await wipeSourceFile(req.file.path);
     return;
   }
 };
@@ -1447,6 +1446,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
         messageContent = messageCode.msgInvalidParams;
       }
       res.status(400).json({ code: 400, status: "FAILED", message: messageContent, details: email });
+      await wipeSourceFile(req.file.path);
       return;
     }
 
@@ -1468,9 +1468,12 @@ const dynamicBatchIssueCredentials = async (req, res) => {
     }
     // Create a readable stream from the zip file
     const readStream = fs.createReadStream(filePath);
-    const updatedDestinationPath = path.join(extractionPath, customFolderName);
-    destDirectory = path.join(__dirname, "../../uploads", updatedDestinationPath, "completed");
+    const uploadsPath = path.join(__dirname, "../../uploads");
+    const updatedDestinationPath = path.join(__dirname, "../../uploads", customFolderName);
+    destDirectory = path.join(__dirname, "../../uploads", customFolderName, "completed");
     console.log("The updated folder", updatedDestinationPath);
+
+    await removeEmptyFolders(uploadsPath);
 
     if (fs.existsSync(destDirectory)) {
       // Delete the existing directory recursively
@@ -1493,7 +1496,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
     // Delete the source zip file after extraction
     await wipeSourceFile(req.file.path);
 
-    let zipExist = await _findDirectories(filesList, customFolderName);
+    let zipExist = await findDirectories(filesList, customFolderName);
     if (zipExist) {
       filesList = zipExist;
     }
@@ -1671,13 +1674,16 @@ const dynamicBatchIssueCredentials = async (req, res) => {
 
         // Pipe the output stream to the zip archive
         archive.pipe(output);
+
+        var filesList = await getPdfFiles(destDirectory);
+
         var excelFileName = path.basename(excelFilePath);
         // Append the file to the list
-        pdfFiles.push(excelFileName);
+        filesList.push(excelFileName);
 
         // Add PDF files to the zip archive
-        pdfFiles.forEach(file => {
-          const filePath = path.join(destDirectory, file);
+        filesList.forEach(file => {
+          var filePath = path.join(destDirectory, file);
           archive.file(filePath, { name: file });
         });
 
@@ -1688,17 +1694,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
         if (fs.existsSync(excelFilePath)) {
           fs.unlinkSync(excelFilePath);
         }
-        let uploadPath = path.join(__dirname, '../../uploads', customFolderName);
-        let files = fs.readdirSync(uploadPath);
-        console.log("Files remain", files);
-        // await flushUploadFolder();
-        // await removeEmptyFolders(uploadPath);
-        // let ifFileExist = path.join(uploadPath, file.filename);
-        // console.log("The file", file, ifFileExist);
-        // if (fs.existsSync(ifFileExist)) {
-        //   fs.unlinkSync(ifFileExist);
-        // }
-        await wipeSourceFolder(customFolderName);
+
         return;
       } else {
         var statusCode = bulkIssueResponse.code || 400;
@@ -1734,7 +1730,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
 
   } catch (error) {
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
-    // await wipeSourceFolder(customFolderName);
+    await wipeSourceFile(req.file.path);
     return;
   }
 };
@@ -1819,6 +1815,7 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
         messageContent = messageCode.msgInvalidParams;
       }
       res.status(400).json({ code: 400, status: "FAILED", message: messageContent, Details: email });
+      await wipeSourceFile(req.file.path);
       return;
     }
 
@@ -1841,9 +1838,12 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
     }
     // Create a readable stream from the zip file
     const readStream = fs.createReadStream(filePath);
-    const updatedDestinationPath = path.join(extractionPath, customFolderName);
-    destDirectory = path.join(__dirname, "../../uploads", updatedDestinationPath, "completed");
+    const uploadsPath = path.join(__dirname, "../../uploads");
+    const updatedDestinationPath = path.join(__dirname, "../../uploads", customFolderName);
+    destDirectory = path.join(__dirname, "../../uploads", customFolderName, "completed");
     console.log("The updated folder", updatedDestinationPath);
+
+    await removeEmptyFolders(uploadsPath);
 
     if (fs.existsSync(destDirectory)) {
       // Delete the existing directory recursively
@@ -1867,7 +1867,7 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
     // Delete the source zip file after extraction
     await wipeSourceFile(req.file.path);
 
-    let zipExist = await _findDirectories(filesList, customFolderName);
+    let zipExist = await findDirectories(filesList, customFolderName);
     if (zipExist) {
       filesList = zipExist;
     }
@@ -2012,7 +2012,6 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
 
         const zipFileName = `${formattedDateTime}.zip`;
         const resultFilePath = path.join(__dirname, '../../uploads', customFolderName, zipFileName);
-
         // Create a new zip archive
         const archive = archiver('zip', {
           zlib: { level: 9 } // Sets the compression level
@@ -2034,17 +2033,18 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
             }
           }
           console.log('Zip file created successfully');
+
           if (fs.existsSync(destDirectory)) {
             // Delete the existing directory recursively
             fs.rmSync(destDirectory, { recursive: true });
           }
+
           // Send the zip file as a download
           res.download(resultFilePath, zipFileName, (err) => {
             if (err) {
               console.error('Error downloading zip file:', err);
             }
             // Delete the zip file after download
-            // fs.unlinkSync(resultFilePath);
             fs.unlinkSync(resultFilePath, (err) => {
               if (err) {
                 console.error('Error deleting zip file:', err);
@@ -2056,13 +2056,16 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
 
         // Pipe the output stream to the zip archive
         archive.pipe(output);
+
+        var filesList = await getPdfFiles(destDirectory);
+
         var excelFileName = path.basename(excelFilePath);
         // Append the file to the list
-        pdfFiles.push(excelFileName);
+        filesList.push(excelFileName);
 
         // Add PDF files to the zip archive
-        pdfFiles.forEach(file => {
-          const filePath = path.join(destDirectory, file);
+        filesList.forEach(file => {
+          var filePath = path.join(destDirectory, file);
           archive.file(filePath, { name: file });
         });
 
@@ -2073,17 +2076,7 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
         if (fs.existsSync(excelFilePath)) {
           fs.unlinkSync(excelFilePath);
         }
-        let uploadPath = path.join(__dirname, '../../uploads', customFolderName);
-        let files = fs.readdirSync(uploadPath);
-        console.log("Files remain", files);
-        // await flushUploadFolder();
-        // await removeEmptyFolders(uploadPath);
-        // let ifFileExist = path.join(uploadPath, file.filename);
-        // console.log("The file", file, ifFileExist);
-        // if (fs.existsSync(ifFileExist)) {
-        //   fs.unlinkSync(ifFileExist);
-        // }
-        await wipeSourceFolder(customFolderName);
+
         return;
       } else {
         var statusCode = bulkIssueResponse.code || 400;
@@ -2119,10 +2112,11 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
 
   } catch (error) {
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
-    // await wipeSourceFolder(customFolderName);
+    await wipeSourceFile(req.file.path);
     return;
   }
 };
+
 
 /**
  * API call for store dynamic QR poisioning parameters for the Dynamic Bulk Issue.
@@ -2149,12 +2143,14 @@ const acceptDynamicInputs = async (req, res) => {
 
   if (!email || !positionx || !positiony || !qrSide) {
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidInput, details: email });
+    await wipeSourceFile(req.file.path);
     return;
   }
 
   var isIssuerExist = await isValidIssuer(email);
   if (!isIssuerExist) {
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuer, details: email });
+    await wipeSourceFile(req.file.path);
     return;
   }
 
@@ -2249,6 +2245,7 @@ const validateDynamicBulkIssueDocuments = async (req, res) => {
         messageContent = messageCode.msgInvalidParams;
       }
       res.status(400).json({ code: 400, status: "FAILED", message: messageContent, details: email });
+      await wipeSourceFile(req.file.path);
       return;
     }
     // Function to check if a file is empty
@@ -2285,7 +2282,7 @@ const validateDynamicBulkIssueDocuments = async (req, res) => {
     // Delete the source zip file after extraction
     await wipeSourceFile(req.file.path);
     console.log("Unzip response1", filesList, filesList.length);
-    let zipExist = await _findDirectories(filesList, customFolderName);
+    let zipExist = await findDirectories(filesList, customFolderName);
     if (zipExist) {
       filesList = zipExist;
     }
@@ -2400,84 +2397,7 @@ const validateDynamicBulkIssueDocuments = async (req, res) => {
 };
 
 // Function to check if a path is a directory
-const findDirectories = async (items) => {
-  const results = [];
-  const movedFiles = [];
-
-  // Ensure uploadPath exists
-  try {
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-      console.log(`Created uploadPath: ${uploadPath}`);
-    }
-  } catch (err) {
-    console.error(`Error ensuring uploadPath exists:`, err);
-    return false; // Return empty array if there's an error
-  }
-
-  for (const item of items) {
-    const fullPath = path.join(uploadPath, item);
-    try {
-      const stats = fs.statSync(fullPath);
-      if (stats.isDirectory()) {
-        results.push(fullPath);
-      }
-    } catch (err) {
-      // Ignore errors (e.g., file not found)
-    }
-  }
-
-  if (results.length > 0) {
-    // console.log('Directories found:', results);
-    for (const dir of results) {
-      // console.log(`Files in directory ${dir}:`);
-      try {
-        const files = fs.readdirSync(dir);
-        files.forEach(file => {
-          const oldPath = path.join(dir, file);
-          const newPath = path.join(uploadPath, file);
-
-          // Move file
-          try {
-            fs.renameSync(oldPath, newPath);
-            movedFiles.push(file); // Add moved file to the list
-            // console.log(`Moved ${file} to ${uploadPath}`);
-          } catch (err) {
-            console.error(`Error moving file ${file}:`, err);
-          }
-        });
-
-        // Remove the directory if it's empty
-        // try {
-        //   // Check if the directory still exists before trying to read it
-        //   if (fs.existsSync(dir)) {
-        //     const remainingFiles = fs.readdirSync(dir);
-        //     if (remainingFiles.length === 0) {
-        //       console.log("Directory path", dir);
-        //       fs.rmdirSync(dir);
-        //       // fs.unlinkSync(dir);
-        //       console.log(`Removed empty directory ${dir}`);
-        //     }
-        //   } else {
-        //     console.warn(`Directory ${dir} does not exist anymore`);
-        //   }
-        // } catch (err) {
-        //   console.error(`Error removing directory ${dir}:`, err);
-        // }
-      } catch (err) {
-        console.error(`Error reading directory ${dir}:`, err);
-      }
-    }
-  } else {
-    console.log('No additional directories found');
-    return false;
-  }
-  // Return the list of moved files
-  console.log("Files", movedFiles);
-  return movedFiles;
-};
-
-const _findDirectories = async (items, endFolder) => {
+const findDirectories = async (items, endFolder) => {
   const results = [];
   const movedFiles = [];
   const updatedPath = path.join(uploadPath, endFolder);
@@ -2652,34 +2572,6 @@ const backupFileToCloud = async (file, filePath, type) => {
   }
 };
 
-async function removeEmptyFolders(dir) {
-  try {
-    // Read the contents of the directory
-    const files = fs.readdirSync(dir);
-
-    // Loop through each file and directory
-    for (const file of files) {
-      const filePath = path.join(dir, file);
-      const stats = fs.statSync(filePath);
-
-      // If it's a directory, recursively check for empty folders
-      if (stats.isDirectory()) {
-        await removeEmptyFolders(filePath); // Recursive call
-
-        // After checking subdirectories, recheck if the folder is empty
-        const remainingFiles = fs.readdirSync(filePath);
-        if (remainingFiles.length === 0) {
-          // If empty, remove the folder
-          fs.rmdirSync(filePath);
-          console.log(`Removed empty folder: ${filePath}`);
-        }
-      }
-    }
-  } catch (error) {
-    console.error(`Error: ${error.message}`);
-  }
-};
-
 module.exports = {
   // Function to issue a PDF certificate
   issuePdf,
@@ -2691,6 +2583,7 @@ module.exports = {
   issueDynamicPdf,
 
   issueDynamicCredential,
+  dynamicBatchIssueCredentials,
 
   // Function to issue a certification
   issue,
@@ -2700,7 +2593,6 @@ module.exports = {
 
   // Function to issue a Dynamic Bulk issues (batch) of certifications
   dynamicBatchIssueCertificates,
-  dynamicBatchIssueCredentials,
   dynamicBatchIssueConcurrency,
 
   // Function to accept pdf & qr dimensions  Batch of certifications
