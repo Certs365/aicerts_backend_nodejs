@@ -195,6 +195,7 @@ const issuePdf = async (req, res) => {
 
       // Send Pdf file
       res.send(issueResponse.file);
+      await wipeSourceFile(req.file.path);
       return;
 
     } else {
@@ -297,6 +298,7 @@ const issueDynamicPdf = async (req, res) => {
 
       // Send Pdf file
       res.send(issueResponse.file);
+      await wipeSourceFile(req.file.path);
       return;
 
     } else {
@@ -538,6 +540,7 @@ const issueDynamicCredential = async (req, res) => {
 
       if (_grantDate == "1" || _grantDate == null || _grantDate == "string") {
         res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidGrantDate, details: req.body.grantDate });
+        await wipeSourceFile(req.file.path);
         return;
       }
       if (req.body.expirationDate == 1 || req.body.expirationDate == null || req.body.expirationDate == "string") {
@@ -548,6 +551,7 @@ const issueDynamicCredential = async (req, res) => {
 
       if (_expirationDate == null) {
         res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidExpirationDate, details: req.body.expirationDate });
+        await wipeSourceFile(req.file.path);
         return;
       }
 
