@@ -2252,7 +2252,7 @@ const validateDynamicBulkIssueDocuments = async (req, res) => {
     var zipFileSize = parseInt(stats.size);
     if (zipFileSize <= 100) {
       res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgUnableToFindFiles });
-      await wipeSourceFile(filePath);
+      await wipeSourceFile(req.file.path);
       return;
     }
 
@@ -2279,7 +2279,7 @@ const validateDynamicBulkIssueDocuments = async (req, res) => {
 
     filesList = await fs.promises.readdir(destDirectory);
     // Delete the source zip file after extraction
-    await wipeSourceFile(filePath);
+    await wipeSourceFile(req.file.path);
     console.log("Unzip response1", filesList, filesList.length);
     let zipExist = await _findDirectories(filesList, customFolderName);
     if (zipExist) {
