@@ -656,7 +656,7 @@ const batchIssueCertificate = async (req, res) => {
   // Check if the file path matches the pattern
   if (req.file.mimetype != fileType) {
     // Delete the source file
-    await wipeSourceFile(file.path);
+    await wipeSourceFile(req.file.path);
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgMustExcel });
     return;
   }
@@ -668,7 +668,7 @@ const batchIssueCertificate = async (req, res) => {
   // Check if the file extension is in the allowed list
   if (!allowedExtensions.includes(fileExtension)) {
     // Delete the source file
-    await wipeSourceFile(file.path);
+    await wipeSourceFile(req.file.path);
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgMustExcel });
     return;
   }
@@ -682,16 +682,16 @@ const batchIssueCertificate = async (req, res) => {
         existIssuerId = issuerExist.issuerId;
         let fetchCredits = await getIssuerServiceCredits(existIssuerId, 'issue');
         if (fetchCredits === true) {
-          await wipeSourceFile(file.path);
+          await wipeSourceFile(req.file.path);
           return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaStatus });
         }
         if (fetchCredits) {
         } else {
-          await wipeSourceFile(file.path);
+          await wipeSourceFile(req.file.path);
           return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaExceeded });
         }
       } else {
-        await wipeSourceFile(file.path);
+        await wipeSourceFile(req.file.path);
         return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuerId });
       }
     }
@@ -730,7 +730,7 @@ const batchIssueCertificate = async (req, res) => {
         } else if (idExist.status !== 1) {
           errorMessage = messageCode.msgUnauthIssuer;
         }
-        await wipeSourceFile(file.path);
+        await wipeSourceFile(req.file.path);
         res.status(400).json({ code: 400, status: "FAILED", message: errorMessage, details: _details });
         return;
 
@@ -784,7 +784,7 @@ const batchIssueCertificate = async (req, res) => {
           const isPaused = await newContract.paused();
           // Check if the Issuer wallet address is a valid Ethereum address
           if (!ethers.isAddress(idExist.issuerId)) {
-            await wipeSourceFile(file.path);
+            await wipeSourceFile(req.file.path);
             return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidEthereum });
           }
           const issuerAuthorized = await newContract.hasRole(process.env.ISSUER_ROLE, idExist.issuerId);
@@ -796,7 +796,7 @@ const batchIssueCertificate = async (req, res) => {
             if (issuerAuthorized === flase) {
               messageContent = messageCode.msgIssuerUnauthrized;
             }
-            await wipeSourceFile(file.path);
+            await wipeSourceFile(req.file.path);
             return res.status(400).json({ code: 400, status: "FAILED", message: messageContent });
           }
 
@@ -815,7 +815,7 @@ const batchIssueCertificate = async (req, res) => {
 
           let { txHash, txFee } = await issueBatchCertificateWithRetry(tree.root, dateEntry);
           if (!txHash) {
-            await wipeSourceFile(file.path);
+            await wipeSourceFile(req.file.path);
             return ({ code: 400, status: false, message: messageCode.msgFaileToIssueAfterRetry, details: certificateNumber });
           }
 
@@ -947,30 +947,30 @@ const batchIssueCertificate = async (req, res) => {
               details: batchDetailsWithQR,
             });
 
-            await wipeSourceFile(file.path);
+            await wipeSourceFile(req.file.path);
             return;
 
           } catch (error) {
             // Handle mongoose connection error (log it, response an error, etc.)
             console.error(messageCode.msgInternalError, error);
-            await wipeSourceFile(file.path);
+            await wipeSourceFile(req.file.path);
             return res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
           }
 
         } catch (error) {
           console.error('Error:', error);
-          await wipeSourceFile(file.path);
+          await wipeSourceFile(req.file.path);
           return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgFailedAtBlockchain, details: error });
         }
       }
     } catch (error) {
       console.error('Error:', error);
-      await wipeSourceFile(file.path);
+      await wipeSourceFile(req.file.path);
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidExcel, details: error });
     }
   } catch (error) {
     console.error('Error:', error);
-    await wipeSourceFile(file.path);
+    await wipeSourceFile(req.file.path);
     return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
   }
 };
@@ -1036,16 +1036,16 @@ const dynamicBatchIssueCertificates = async (req, res) => {
           existIssuerId = issuerExist.issuerId;
           let fetchCredits = await getIssuerServiceCredits(existIssuerId, 'issue');
           if (fetchCredits === true) {
-            await wipeSourceFile(filePath);
+            await wipeSourceFile(req.file.path);
             return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaStatus });
           }
           if (fetchCredits) {
           } else {
-            await wipeSourceFile(filePath);
+            await wipeSourceFile(req.file.path);
             return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaExceeded });
           }
         } else {
-          await wipeSourceFile(filePath);
+          await wipeSourceFile(req.file.path);
           return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuerId });
         }
       }
@@ -1076,7 +1076,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
     var zipFileSize = parseInt(stats.size);
     if (zipFileSize <= 100) {
       res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgUnableToFindFiles });
-      await wipeSourceFile(filePath);
+      await wipeSourceFile(req.file.path);
       return;
     }
     // Create a readable stream from the zip file
@@ -1105,7 +1105,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
 
     filesList = await fs.promises.readdir(updatedDestinationPath);
     // Delete the source zip file after extraction
-    await wipeSourceFile(filePath);
+    await wipeSourceFile(req.file.path);
 
     let zipExist = await _findDirectories(filesList, customFolderName);
     if (zipExist) {
@@ -1419,16 +1419,16 @@ const dynamicBatchIssueCredentials = async (req, res) => {
           existIssuerId = issuerExist.issuerId;
           let fetchCredits = await getIssuerServiceCredits(existIssuerId, 'issue');
           if (fetchCredits === true) {
-            await wipeSourceFile(filePath);
+            await wipeSourceFile(req.file.path);
             return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaStatus });
           }
           if (fetchCredits) {
           } else {
-            await wipeSourceFile(filePath);
+            await wipeSourceFile(req.file.path);
             return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaExceeded });
           }
         } else {
-          await wipeSourceFile(filePath);
+          await wipeSourceFile(req.file.path);
           return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuerId });
         }
       }
@@ -1459,7 +1459,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
     var zipFileSize = parseInt(stats.size);
     if (zipFileSize <= 100) {
       res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgUnableToFindFiles });
-      await wipeSourceFile(filePath);
+      await wipeSourceFile(req.file.path);
       return;
     }
     // Create a readable stream from the zip file
@@ -1487,7 +1487,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
     });
     filesList = await fs.promises.readdir(updatedDestinationPath);
     // Delete the source zip file after extraction
-    await wipeSourceFile(filePath);
+    await wipeSourceFile(req.file.path);
 
     let zipExist = await _findDirectories(filesList, customFolderName);
     if (zipExist) {
@@ -1791,16 +1791,16 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
           existIssuerId = issuerExist.issuerId;
           let fetchCredits = await getIssuerServiceCredits(existIssuerId, 'issue');
           if (fetchCredits === true) {
-            await wipeSourceFile(filePath);
+            await wipeSourceFile(req.file.path);
             return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaStatus });
           }
           if (fetchCredits) {
           } else {
-            await wipeSourceFile(filePath);
+            await wipeSourceFile(req.file.path);
             return res.status(503).json({ code: 503, status: "FAILED", message: messageCode.msgIssuerQuotaExceeded });
           }
         } else {
-          await wipeSourceFile(filePath);
+          await wipeSourceFile(req.file.path);
           return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuerId });
         }
       }
@@ -1832,7 +1832,7 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
     var zipFileSize = parseInt(stats.size);
     if (zipFileSize <= 100) {
       res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgUnableToFindFiles });
-      await wipeSourceFile(filePath);
+      await wipeSourceFile(req.file.path);
       return;
     }
     // Create a readable stream from the zip file
@@ -1861,7 +1861,7 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
 
     filesList = await fs.promises.readdir(updatedDestinationPath);
     // Delete the source zip file after extraction
-    await wipeSourceFile(filePath);
+    await wipeSourceFile(req.file.path);
 
     let zipExist = await _findDirectories(filesList, customFolderName);
     if (zipExist) {
@@ -2132,7 +2132,7 @@ const acceptDynamicInputs = async (req, res) => {
   if (!req.file || !req.file.originalname.endsWith('.pdf')) {
     // File path does not match the pattern
     const errorMessage = messageCode.msgMustPdf;
-    await wipeSourceFile(file);
+    await wipeSourceFile(req.file.path);
     res.status(400).json({ status: "FAILED", message: errorMessage, details: req.file });
     return;
   }
@@ -2161,7 +2161,7 @@ const acceptDynamicInputs = async (req, res) => {
     if (pdfResponse.morePages == 1) {
       messageContent = messageCode.msgMultiPagePdf
     }
-    await wipeSourceFile(file);
+    await wipeSourceFile(req.file.path);
     res.status(400).json({ code: 400, status: "FAILED", message: messageContent, details: email });
     return;
   }
@@ -2196,12 +2196,12 @@ const acceptDynamicInputs = async (req, res) => {
         await isParamsExist.save();
 
       }
-      await wipeSourceFile(file);
+      await wipeSourceFile(req.file.path);
       res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgUnderConstruction, details: isParamsExist });
       return;
     }
   } catch (error) {
-    await wipeSourceFile(file);
+    await wipeSourceFile(req.file.path);
     res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgDbNotReady, details: error });
     return;
   }
