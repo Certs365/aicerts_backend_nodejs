@@ -1030,7 +1030,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
 
     var filePath = req.file.path;
     const email = req.body.email;
-    const flag = parseInt(req.body.flag);
+    var flag = parseInt(req.body.flag);
     var queueOption;
 
     // Verify with existing credits limit of an issuer to perform the operation
@@ -1252,6 +1252,7 @@ const dynamicBatchIssueCertificates = async (req, res) => {
     if (queueOption == 0) {
       bulkIssueResponse = await dynamicBulkCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
     } else {
+      flag = 0;
       bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
     }
 
@@ -1410,7 +1411,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
 
     var filePath = req.file.path;
     const email = req.body.email;
-    const flag = parseInt(req.body.flag);
+    var flag = parseInt(req.body.flag);
     var queueOption;
 
     // Verify with existing credits limit of an issuer to perform the operation
@@ -1622,6 +1623,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
       return;
     }
 
+    flag = 0;
     bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
 
     if (bulkIssueStatus == 'ZIP_STORE' || flag == 1) {
@@ -1780,7 +1782,7 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
 
     var filePath = req.file.path;
     const email = req.body.email;
-    const flag = parseInt(req.body.flag);
+    var flag = parseInt(req.body.flag);
     var queueOption;
 
     // Verify with existing credits limit of an issuer to perform the operation
@@ -2003,6 +2005,7 @@ const dynamicBatchIssueConcurrency = async (req, res) => {
     if (queueOption == 0) {
       bulkIssueResponse = await dynamicBulkCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
     } else {
+      flag = 0;
       bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
     }
 

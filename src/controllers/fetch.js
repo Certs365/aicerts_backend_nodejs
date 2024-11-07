@@ -1278,6 +1278,7 @@ const fetchIssuesLogDetails = async (req, res) => {
             issuerId: issuerExist.issuerId,
             certificateStatus: { $in: [1, 2, 4] },
             expirationDate: { $ne: "1" },
+            type: { $ne: "dynamic"},
             url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket }
           };
 
@@ -1307,7 +1308,6 @@ const fetchIssuesLogDetails = async (req, res) => {
 
           // Sort the data based on the 'issueDate' date in descending order
           // queryResponse.sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate));
-
           for (let item8 of queryResponse) {
             let certificateNumber = item8.certificateNumber;
             const issueStatus8 = await IssueStatus.findOne({ certificateNumber });

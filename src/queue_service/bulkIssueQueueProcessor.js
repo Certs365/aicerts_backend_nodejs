@@ -477,23 +477,23 @@ const insertDynamicBatchCertificateDataBulk = async (dataArray) => {
   try {
     // Map the input data array to the structure required by the DynamicBatchIssues model
     const bulkInsertData = dataArray.map(data => ({
-      issuerId: data.issuerId,
-      batchId: data.batchId,
-      proofHash: data.proofHash,
-      encodedProof: data.encodedProof,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
-      certificateFields: data.customFields,
+      issuerId: data?.issuerId,
+      batchId: data?.batchId,
+      proofHash: data?.proofHash,
+      encodedProof: data?.encodedProof,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
+      certificateFields: data?.customFields || [],
       certificateStatus: 1, // Set default status if necessary
-      positionX: data.positionX,
-      positionY: data.positionY,
-      qrSize: data.qrSize,
-      width: data.width,
-      height: data.height,
-      qrOption: data.qrOption || 0,
-      url: data.url || '',
+      positionX: data?.positionX || 0,
+      positionY: data?.positionY || 0,
+      qrSize: data?.qrSize || 0,
+      width: data?.width || 0,
+      height: data?.height || 0,
+      qrOption: data?.qrOption || 0,
+      url: data?.url || '',
       type: 'dynamic',
       issueDate: Date.now()
     }));
@@ -516,13 +516,13 @@ const insertDynamicBatchCertificateDataBulk = async (dataArray) => {
       lastUpdate: Date.now()
     }));
   
-
     // Perform bulk insert into IssueStatus
     await IssueStatus.insertMany(bulkStatusData, { ordered: false });
     console.log(`Inserted ${bulkStatusData.length} issue status records in bulk.`);
 
   } catch (error) {
     console.error("Error in bulk insert:", error);
+    console.error("Failed data:", dataArray);
   }
 };
 
