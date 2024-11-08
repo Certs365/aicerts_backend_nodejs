@@ -2330,11 +2330,11 @@ const failedErrorObject = {
 };
 
 const processListener = async (job) => {
-  const globalData = getGlobalDataforQueue()
+  // const globalData = getGlobalDataforQueue()
   try {
 
     // Process the job
-    const result = await processBulkIssueJob(job, globalData);
+    const result = await processBulkIssueJob(job);
 
     // Check the result and handle failures
     if (result.status === false) {
@@ -2491,7 +2491,29 @@ const dynamicBatchCertificates = async (
 
         const bulkIssueQueue = new Queue(queueName, redisConfig);
 
-        setGlobalDataforQueue({
+        // setGlobalDataforQueue({
+        //   pdfWidth,
+        //   pdfHeight,
+        //   linkUrl,
+        //   qrside,
+        //   posx,
+        //   posy,
+        //   excelResponse,
+        //   hashedBatchData,
+        //   serializedTree,
+        //   email,
+        //   issuerId,
+        //   allocateBatchId,
+        //   txHash,
+        //   bulkIssueStatus,
+        //   customFolder,
+        //   flag,
+        //   qrOption,
+        // })
+
+
+        const jobDataCallback = (chunk,queueId) => ({
+          pdfResponse: chunk,
           pdfWidth,
           pdfHeight,
           linkUrl,
@@ -2509,11 +2531,7 @@ const dynamicBatchCertificates = async (
           customFolder,
           flag,
           qrOption,
-        })
-
-
-        const jobDataCallback = (chunk) => ({
-          pdfResponse: chunk,
+          queueId
 
         });
         // Add jobs in chunks with custom job data
@@ -2521,12 +2539,14 @@ const dynamicBatchCertificates = async (
           bulkIssueQueue,
           pdfResponse,
           chunkSize,
+          queueId,
           jobDataCallback
+          
         );
         bulkIssueQueue.process(concurrency, processListener);
         let insertUrl;
         try {
-          insertUrl = await waitForJobsToComplete(jobs);
+          insertUrl = await waitForJobsToComplete(jobs,queueId);
           console.log("bulk issue queue processing completed");
         } catch (error) {
           return {
@@ -2546,25 +2566,25 @@ const dynamicBatchCertificates = async (
               Details: [],
             });
             // console.log("finally done")
-            setGlobalDataforQueue({
-              pdfWidth: null,
-              pdfHeight: null,
-              linkUrl: null,
-              qrside: null,
-              posx: null,
-              posy: null,
-              excelResponse: null,
-              hashedBatchData: null,
-              serializedTree: null,
-              email: null,
-              issuerId: null,
-              allocateBatchId: null,
-              txHash: null,
-              bulkIssueStatus: null,
-              customFolder: null,
-              flag: null,
-              qrOption: null,
-            })
+            // setGlobalDataforQueue({
+            //   pdfWidth: null,
+            //   pdfHeight: null,
+            //   linkUrl: null,
+            //   qrside: null,
+            //   posx: null,
+            //   posy: null,
+            //   excelResponse: null,
+            //   hashedBatchData: null,
+            //   serializedTree: null,
+            //   email: null,
+            //   issuerId: null,
+            //   allocateBatchId: null,
+            //   txHash: null,
+            //   bulkIssueStatus: null,
+            //   customFolder: null,
+            //   flag: null,
+            //   qrOption: null,
+            // })
 
           } catch (error) {
             console.log("erro while deleting upload folder..", error.message)

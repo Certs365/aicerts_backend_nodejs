@@ -625,7 +625,8 @@ const handleBatchExcelFile = async (_path, issuer) => {
           bulkIssueExcelQueueProcessor,
           rawBatchData,
           chunkSize,
-          (chunk) => ({ chunk, rows, issuerId }) // Include batchId in job data
+          issuerId,
+          (chunk,issuerId) => ({ chunk, rows, issuerId }) // Include batchId in job data
         );
 
         // Assuming `jobs` is an array of job objects

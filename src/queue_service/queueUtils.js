@@ -37,12 +37,12 @@ const processExcelJob = async (job) => {
 };
 
 // Add jobs to queue in chunks with error handling
-async function addJobsInChunks(queue, data, chunkSize, jobDataCallback) {
+async function addJobsInChunks(queue, data, chunkSize,queueId, jobDataCallback) {
   const jobs = [];
   try {
     for (let i = 0; i < data.length; i += chunkSize) {
       const chunk = data.slice(i, i + chunkSize);
-      const jobData = jobDataCallback ? jobDataCallback(chunk) : chunk; // Use callback or default to chunk
+      const jobData = jobDataCallback ? jobDataCallback(chunk,queueId) : chunk; // Use callback or default to chunk
       // Add job to the queue
       const job = await queue.add(jobData, { attempts: 2 });
       console.log("job added to bulkIssue Queue", i)
@@ -108,7 +108,7 @@ async function cleanUpStalledCheck(queueName) {
 }
 
 // Wait for all jobs to complete with error handling
-const waitForJobsToComplete = async (jobs) => {
+const waitForJobsToComplete = async (jobs, queueId) => {
   try {
     const results = await Promise.all(
       jobs.map((job) =>
@@ -124,12 +124,16 @@ const waitForJobsToComplete = async (jobs) => {
       )
     );
 
-    // Extract all URLS from the results
-    const allUrls = results.flatMap((result) => {
-      console.log(result.URLS)
-      return result.URLS
+    // Filter and extract URLs for the specific queueId
+    const filteredUrls = results.flatMap((result) => {
+      if (result.queueId === queueId) {
+        console.log("URLs for queueId:", result.queueId, result.URLS);
+        return result.URLS;  // Return URLs only for the matching queueId
+      }
+      return [];  // If queueId does not match, return an empty array
     });
-    return allUrls; // Return the aggregated URLs
+
+    return filteredUrls; // Return filtered URLs only for the matching queueId
   } catch (error) {
     console.error("Error waiting for jobs to complete:", error.message);
     throw {
@@ -140,6 +144,7 @@ const waitForJobsToComplete = async (jobs) => {
     };
   }
 };
+
 const getChunkSizeAndConcurrency = (count) => {
   if (count <= 100) {
     return { chunkSize: 10, concurrency: 10 };

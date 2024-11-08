@@ -78,9 +78,9 @@ s3UploadQueue.process(10, async (job) => {
   }
 });
 
-async function processBulkIssueJob(job,globalData) {
-  const { pdfResponse } = job.data;
-  const {
+async function processBulkIssueJob(job) {
+    const {
+    pdfResponse,
     pdfWidth,
     pdfHeight,
     linkUrl,
@@ -98,7 +98,8 @@ async function processBulkIssueJob(job,globalData) {
     flag,
     customFolder,
     qrOption,
-  } = globalData;
+  } = job.data;
+
 
   const certificateDataArray = []; // Array to collect all certificate data
   const insertUrl = []; // For URLS to return
