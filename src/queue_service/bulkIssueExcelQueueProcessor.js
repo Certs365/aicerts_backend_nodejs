@@ -155,7 +155,6 @@ const findRepetitiveIdNumbers = async (data) => {
   return repetitiveNumbers;
 };
 
-
 const findInvalidDates = async (dates) => {
   const validDates = [];
   const invalidDates = [];

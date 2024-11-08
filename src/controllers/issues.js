@@ -24,12 +24,7 @@ const AWS = require('../config/aws-config');
 const { generateVibrantQr } = require('../utils/generateImage');
 
 // Import MongoDB models
-const { User, Issues, BatchIssues, DynamicParameters, DynamicBatchIssues } = require("../config/schema");
-
-// Import ABI (Application Binary Interface) from the JSON file located at "../config/abi.json"
-const abi = require("../config/abi.json");
-
-const extractionPath = path.join(__dirname, "../../uploads");
+const { Issues, BatchIssues, DynamicParameters } = require("../config/schema");
 
 const bulkIssueStatus = process.env.BULK_ISSUE_STATUS || 'DEFAULT';
 const cloudStore = process.env.CLOUD_STORE || 'DEFAULT';
@@ -42,7 +37,6 @@ const qrXPosition = parseInt(process.env.STATIC_X_POSITION) || null;
 const qrYPosition = parseInt(process.env.STATIC_Y_POSITION) || null;
 const staticQrSize = parseInt(process.env.STATIC_QR_SIZE) || null;
 
-const destDirectory = path.join(__dirname, '../../uploads/completed');
 const uploadPath = path.join(__dirname, '../../uploads');
 
 // Importing functions from a custom module
@@ -55,7 +49,6 @@ const {
   insertBatchCertificateData, // Function to insert Batch certificate data into the database
   calculateHash, // Function to calculate the hash of a file
   isDBConnected, // Function to check if the database connection is established
-  insertUrlData,
   getIssuerServiceCredits,
   updateIssuerServiceCredits,
   validatePDFDimensions,
@@ -71,26 +64,6 @@ const {
 const { fetchOrEstimateTransactionFee } = require('../utils/upload');
 const { handleExcelFile, handleBulkExcelFile, handleBatchExcelFile, getExcelRecordsCount } = require('../services/handleExcel');
 const { handleIssueCertification, handleIssuePdfCertification, handleIssueDynamicPdfCertification, handleIssueDynamicCertification, dynamicBatchCertificates, dynamicBulkCertificates, handleIssuance } = require('../services/issue');
-
-// Retrieve contract address from environment variable
-const contractAddress = process.env.CONTRACT_ADDRESS;
-
-// Define an array of providers to use as fallbacks
-const providers = [
-  new ethers.AlchemyProvider(process.env.RPC_NETWORK, process.env.ALCHEMY_API_KEY),
-  new ethers.InfuraProvider(process.env.RPC_NETWORK, process.env.INFURA_API_KEY)
-  // Add more providers as needed
-];
-
-// Create a new FallbackProvider instance
-const fallbackProvider = new ethers.FallbackProvider(providers);
-
-// Create a new ethers signer instance using the private key from environment variable and the provider(Fallback)
-// const fallbackProvider = new ethers.FallbackProvider([rpcProvider]);
-const signer = new ethers.Wallet(process.env.PRIVATE_KEY, fallbackProvider);
-
-// Create a new ethers contract instance with a signing capability (using the contract Address, ABI and signer)
-const newContract = new ethers.Contract(contractAddress, abi, signer);
 
 const messageCode = require("../common/codes");
 
@@ -419,11 +392,7 @@ const issueDynamicCredential = async (req, res) => {
   }
 
   if (pdfDoc.getPageCount() > 1) {
-    // Respond with success status and certificate details
-    // await cleanUploadFolder();
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    await wipeSourceFile(req.file.path);
     return res.status(400).json({ status: "FAILED", message: messageCode.msgMultiPagePdf });
   }
   try {
@@ -880,7 +849,6 @@ const batchIssueCertificate = async (req, res) => {
               }
 
               let encryptLink = await generateEncryptedUrl(_fields);
-              let shortUrlStatus = false;
               let modifiedUrl = false;
 
               if (encryptLink) {
@@ -891,14 +859,10 @@ const batchIssueCertificate = async (req, res) => {
                     certificateNumber: rawBatchData[i].certificationID,
                     url: encryptLink
                   }
-                  await insertUrlData(urlData);
-                  shortUrlStatus = true;
                 }
               }
 
-              if (shortUrlStatus) {
-                modifiedUrl = process.env.SHORT_URL + rawBatchData[i].certificationID;
-              }
+              modifiedUrl = process.env.SHORT_URL + rawBatchData[i].certificationID;
 
               let _qrCodeData = modifiedUrl !== false ? modifiedUrl : encryptLink;
 
@@ -1469,7 +1433,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
     }
     // Create a readable stream from the zip file
     const readStream = fs.createReadStream(filePath);
-    
+
     const uploadsPath = path.join(__dirname, "../../uploads");
     const updatedDestinationPath = path.join(__dirname, "../../uploads", customFolderName);
     destDirectory = path.join(__dirname, "../../uploads", customFolderName, "completed");

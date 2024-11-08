@@ -515,36 +515,8 @@ const isCertificationIdExisted = async (certId) => {
   }
 };
 
-const isBulkCertificationIdExisted = async (certId) => {
-  await isDBConnected();
-
-  if (certId == null || certId == "") {
-    return null;
-  }
-
-  const singleIssueExist = await DynamicIssues.findOne({ certificateNumber: certId });
-  const batchIssueExist = await DynamicBatchIssues.findOne({ certificateNumber: certId });
-
-  try {
-    if (singleIssueExist) {
-
-      return singleIssueExist;
-    } else if (batchIssueExist) {
-
-      return batchIssueExist;
-    } else {
-
-      return null;
-    }
-
-  } catch (error) {
-    console.error("Error during validation:", error);
-    return null;
-  }
-};
-
 const isDynamicCertificationIdExisted = async (certId) => {
-  const dbStaus = await isDBConnected();
+  await isDBConnected();
 
   if (certId == null || certId == "") {
     return null;
@@ -610,14 +582,14 @@ const insertIssuanceCertificateData = async (data) => {
   try {
     // Create a new Issues document with the provided data
     const newIssue = new Issues({
-      issuerId: data.issuerId,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
-      course: data.course,
-      grantDate: data.grantDate,
-      expirationDate: data.expirationDate,
+      issuerId: data?.issuerId,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
+      course: data?.course,
+      grantDate: data?.grantDate,
+      expirationDate: data?.expirationDate,
       certificateStatus: 6,
       issueDate: Date.now() // Set the issue date to the current timestamp
     });
@@ -657,23 +629,23 @@ const insertCertificateData = async (data) => {
   try {
     // Create a new Issues document with the provided data
     const newIssue = new Issues({
-      issuerId: data.issuerId,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
-      course: data.course,
-      grantDate: data.grantDate,
-      expirationDate: data.expirationDate,
-      certificateStatus: data.certStatus,
-      positionX: data.positionX,
-      positionY: data.positionY,
-      qrSize: data.qrSize,
-      width: data.width || without_pdf_width,
-      height: data.height || without_pdf_height,
-      qrOption: data.qrOption || 0,
-      url: data.url || '',
-      type: data.type || '',
+      issuerId: data?.issuerId,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
+      course: data?.course,
+      grantDate: data?.grantDate,
+      expirationDate: data?.expirationDate,
+      certificateStatus: data?.certStatus,
+      positionX: data?.positionX,
+      positionY: data?.positionY,
+      qrSize: data?.qrSize,
+      width: data?.width || without_pdf_width,
+      height: data?.height || without_pdf_height,
+      qrOption: data?.qrOption || 0,
+      url: data?.url || '',
+      type: data?.type || '',
       issueDate: Date.now() // Set the issue date to the current timestamp
     });
 
@@ -707,20 +679,20 @@ const insertDynamicCertificateData = async (data) => {
   try {
     // Create a new Issues document with the provided data
     const newDynamicIssue = new DynamicIssues({
-      issuerId: data.issuerId,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
+      issuerId: data?.issuerId,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
       certificateStatus: 1,
-      positionX: data.positionX,
-      positionY: data.positionY,
-      qrSize: data.qrSize,
+      positionX: data?.positionX,
+      positionY: data?.positionY,
+      qrSize: data?.qrSize,
       certificateFields: data.customFields,
-      width: data.width || without_pdf_width,
-      height: data.height || without_pdf_height,
-      qrOption: data.qrOption || 0,
-      url: data.url,
+      width: data?.width || without_pdf_width,
+      height: data?.height || without_pdf_height,
+      qrOption: data?.qrOption || 0,
+      url: data?.url,
       type: 'dynamic',
       issueDate: Date.now() // Set the issue date to the current timestamp
     });
@@ -757,24 +729,24 @@ const insertBatchCertificateData = async (data) => {
   try {
     // Insert data into MongoDB
     const newBatchIssue = new BatchIssues({
-      issuerId: data.issuerId,
-      batchId: data.batchId,
-      proofHash: data.proofHash,
-      encodedProof: data.encodedProof,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
-      course: data.course,
-      grantDate: data.grantDate,
-      expirationDate: data.expirationDate,
-      certificateStatus: data.certStatus,
-      positionX: data.positionX,
-      positionY: data.positionY,
-      qrSize: data.qrSize,
-      width: data.width || without_pdf_width,
-      height: data.height || without_pdf_height,
-      qrOption: data.qrOption || 0,
+      issuerId: data?.issuerId,
+      batchId: data?.batchId,
+      proofHash: data?.proofHash,
+      encodedProof: data?.encodedProof,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
+      course: data?.course,
+      grantDate: data?.grantDate,
+      expirationDate: data?.expirationDate,
+      certificateStatus: data?.certStatus || 1,
+      positionX: data?.positionX,
+      positionY: data?.positionY,
+      qrSize: data?.qrSize,
+      width: data?.width || without_pdf_width,
+      height: data?.height || without_pdf_height,
+      qrOption: data?.qrOption || 0,
       issueDate: Date.now()
     });
 
@@ -803,23 +775,23 @@ const insertDynamicBatchCertificateData = async (data) => {
 
     // Insert data into MongoDB
     const newBatchIssue = new DynamicBatchIssues({
-      issuerId: data.issuerId,
-      batchId: data.batchId,
-      proofHash: data.proofHash,
-      encodedProof: data.encodedProof,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
+      issuerId: data?.issuerId,
+      batchId: data?.batchId,
+      proofHash: data?.proofHash,
+      encodedProof: data?.encodedProof,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
       certificateFields: data.customFields,
       certificateStatus: 1,
-      positionX: data.positionX,
-      positionY: data.positionY,
-      qrSize: data.qrSize,
-      width: data.width || without_pdf_width,
-      height: data.height || without_pdf_height,
-      qrOption: data.qrOption || 0,
-      url: data.url || '',
+      positionX: data?.positionX,
+      positionY: data?.positionY,
+      qrSize: data?.qrSize,
+      width: data?.width || without_pdf_width,
+      height: data?.height || without_pdf_height,
+      qrOption: data?.qrOption || 0,
+      url: data?.url || '',
       type: 'dynamic',
       issueDate: Date.now()
     });
@@ -857,11 +829,11 @@ const insertIssueStatus = async (issueData) => {
       issuerId: issuerId, // ID field is of type String and is required
       batchId: batchId,
       transactionHash: transactionHash, // TransactionHash field is of type String and is required
-      certificateNumber: issueData.certificateNumber, // CertificateNumber field is of type String and is required
+      certificateNumber: issueData?.certificateNumber, // CertificateNumber field is of type String and is required
       course: issueData.course,
-      name: issueData.name,
+      name: issueData?.name,
       expirationDate: formattedDate, // ExpirationDate field is of type String and is required
-      certStatus: issueData.certStatus,
+      certStatus: issueData?.certStatus,
       lastUpdate: Date.now()
     });
     const updateLog = await newIssueStatus.save();
@@ -1529,26 +1501,6 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const cleanUploadFolder = async () => {
-  const uploadFolder = '../uploads'; // Specify the folder path you want
-  const folderPath = path.join(__dirname, '..', uploadFolder);
-
-  // Check if the folder is not empty
-  const filesInFolder = fs.readdirSync(folderPath);
-
-  if (filesInFolder.length > 0) {
-    // Delete all files in the folder
-    filesInFolder.forEach(fileToDelete => {
-      const filePathToDelete = path.join(folderPath, fileToDelete);
-      try {
-        fs.unlinkSync(filePathToDelete);
-      } catch (error) {
-        console.error("Error deleting file:", filePathToDelete, error);
-      }
-    });
-  }
-};
-
 // Function to delete all empty folders (in provided path)
 const removeEmptyFolders = async (dir) => {
   try {
@@ -1607,52 +1559,6 @@ const getPdfFiles = async (folderPath) => {
     return [];
   }
 }
-
-const flushUploadFolder = async () => {
-  const uploadFolder = '../uploads'; // Specify the folder path you want
-  const folderPath = path.join(__dirname, '..', uploadFolder);
-
-  // Check if the folder is not empty
-  const filesInFolder = fs.readdirSync(folderPath);
-
-  const fileToDelete = filesInFolder[0]; // Get the first file in the folder
-  const filePathToDelete = path.join(folderPath, fileToDelete); // Construct the full path of the file to delete
-
-  // Delete the file
-  fs.unlink(filePathToDelete, (err) => {
-    if (err) {
-      console.error(`Error deleting file "${filePathToDelete}":`, err);
-    } else {
-      console.log(`Only Files in "${filePathToDelete}" were deleted successfully.`);
-    }
-  });
-};
-
-const wipeUploadFolder = async () => {
-  const uploadFolder = '../uploads'; // Specify the folder path you want
-  const folderPath = path.join(__dirname, '..', uploadFolder);
-
-  // Check if the folder is not empty
-  const filesInFolder = fs.readdirSync(folderPath);
-
-  if (filesInFolder.length > 0) {
-    // Delete all files in the folder
-    filesInFolder.forEach(fileToDelete => {
-      const filePathToDelete = path.join(folderPath, fileToDelete);
-      try {
-        if (fs.lstatSync(filePathToDelete).isDirectory()) {
-          // If it's a directory, recursively delete it
-          fs.rmSync(filePathToDelete, { recursive: true });
-        } else {
-          // If it's a file, just delete it
-          fs.unlinkSync(filePathToDelete);
-        }
-      } catch (error) {
-        console.error("Error deleting file:", filePathToDelete, error);
-      }
-    });
-  }
-};
 
 const wipeSourceFolder = async (_path) => {
   const folderPath = path.join(__dirname, '../../uploads', _path);
@@ -1935,6 +1841,7 @@ const generateCustomFolder = async (folderName) => {
 
 module.exports = {
 
+  // Fallback object contains provider
   fallbackProvider,
 
   // Function to validate issuer by email
@@ -1955,8 +1862,6 @@ module.exports = {
   isCertificationIdExisted,
 
   // Verify Certification ID from both dynamic bulk collections (single / batch)
-  isBulkCertificationIdExisted,
-
   isDynamicCertificationIdExisted,
 
   // Function to insert single certificate data into MongoDB
@@ -2042,21 +1947,19 @@ module.exports = {
   // Function for filtering file uploads based on MIME type Pdf
   fileFilter,
 
-  // Function to clean up the data in upload folder
-  cleanUploadFolder,
-
-  // Function to flush files in upload folder
-  flushUploadFolder,
-
-  // Function to wipout folders in upload folder
-  wipeUploadFolder,
+  // Function to wipeout folders in upload folder
   wipeSourceFolder,
+
+  // Function to wipe file (in the given file path)
   wipeSourceFile,
 
+  // Function to rename the uploaded file (path)
   renameUploadPdfFile,
 
+  // Function to delete empty folders (given directory path)
   removeEmptyFolders,
 
+  // Function to get all pdf files in the directory (given)
   getPdfFiles,
 
   // Function to check if MongoDB is connected
