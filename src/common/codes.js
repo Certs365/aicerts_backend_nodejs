@@ -41,7 +41,7 @@ module.exports = {
 
     // Handle Excel with Zip
     msgMustZip: "Must upload Zip file format",
-    msgUnableToFindFiles: "Unable to find valid files in the uploaded zip.",
+    msgUnableToFindFiles: "Unable to find valid Excel / pdf files in the upload. Please verify and try again...",
     msgUnableToFindPdfFiles: "Unable to find Credential pdf files.",
     msgUnableToFindExcelFiles: "Unable to find Excel file in the upload.",
     msgFindMoreExcelFiles: "Unable to handle multiple Excel files in the upload.",
