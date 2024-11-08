@@ -345,25 +345,9 @@ const handleIssueCertification = async (
               qrCodeData = urlLink;
             }
 
-            // if (urlLink) {
-            //   let dbStatus = await isDBConnected();
-            //   if (dbStatus) {
-            //     let urlData = {
-            //       email: email,
-            //       certificateNumber: certificateNumber,
-            //       url: urlLink
-            //     }
-            //     await insertUrlData(urlData);
-            //     shortUrlStatus = true;
-            //   }
-            // }
-
-            // if (shortUrlStatus) {
             modifiedUrl = process.env.SHORT_URL + certificateNumber;
-            // }
 
             var _qrCodeData = modifiedUrl != false ? modifiedUrl : qrCodeData;
-            // console.log("Short URL", _qrCodeData);
 
             if (idExist.qrPreference) {
               qrOption = idExist.qrPreference;
@@ -738,22 +722,7 @@ const handleIssuance = async (
           const dataWithLink = { ...fields, polygonLink: polygonLink };
           const urlLink = generateEncryptedUrl(dataWithLink);
 
-          // if (urlLink) {
-          //   let dbStatus = await isDBConnected();
-          //   if (dbStatus) {
-          //     let urlData = {
-          //       email: email,
-          //       certificateNumber: certificateNumber,
-          //       url: urlLink
-          //     }
-          //     await insertUrlData(urlData);
-          //     shortUrlStatus = true;
-          //   }
-          // }
-
-          // if (shortUrlStatus == true) {
           var modifiedUrl = process.env.SHORT_URL + certificateNumber;
-          // }
 
           let _qrCodeData = modifiedUrl != false ? modifiedUrl : urlLink;
 

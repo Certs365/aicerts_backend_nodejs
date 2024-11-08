@@ -880,7 +880,6 @@ const batchIssueCertificate = async (req, res) => {
               }
 
               let encryptLink = await generateEncryptedUrl(_fields);
-              let shortUrlStatus = false;
               let modifiedUrl = false;
 
               if (encryptLink) {
@@ -891,14 +890,10 @@ const batchIssueCertificate = async (req, res) => {
                     certificateNumber: rawBatchData[i].certificationID,
                     url: encryptLink
                   }
-                  await insertUrlData(urlData);
-                  shortUrlStatus = true;
                 }
               }
 
-              if (shortUrlStatus) {
-                modifiedUrl = process.env.SHORT_URL + rawBatchData[i].certificationID;
-              }
+              modifiedUrl = process.env.SHORT_URL + rawBatchData[i].certificationID;
 
               let _qrCodeData = modifiedUrl !== false ? modifiedUrl : encryptLink;
 
@@ -1469,7 +1464,7 @@ const dynamicBatchIssueCredentials = async (req, res) => {
     }
     // Create a readable stream from the zip file
     const readStream = fs.createReadStream(filePath);
-    
+
     const uploadsPath = path.join(__dirname, "../../uploads");
     const updatedDestinationPath = path.join(__dirname, "../../uploads", customFolderName);
     destDirectory = path.join(__dirname, "../../uploads", customFolderName, "completed");
