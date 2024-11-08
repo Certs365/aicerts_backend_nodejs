@@ -98,6 +98,7 @@ async function processBulkIssueJob(job) {
     flag,
     customFolder,
     qrOption,
+    queueId
   } = job.data;
 
 
@@ -146,6 +147,7 @@ async function processBulkIssueJob(job) {
       status: true,
       message: "Batch issued successfully",
       URLS: insertUrl,
+      queueId
     };
   } catch (error) {
     console.error("Error processing bulk issue job:", error);

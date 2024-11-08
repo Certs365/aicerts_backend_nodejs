@@ -126,8 +126,9 @@ const waitForJobsToComplete = async (jobs, queueId) => {
 
     // Filter and extract URLs for the specific queueId
     const filteredUrls = results.flatMap((result) => {
+  
       if (result.queueId === queueId) {
-        console.log("URLs for queueId:", result.queueId, result.URLS);
+
         return result.URLS;  // Return URLs only for the matching queueId
       }
       return [];  // If queueId does not match, return an empty array

@@ -2282,7 +2282,7 @@ const processListener = async (job) => {
     }
 
     // Return the result if successful
-    return { URLS: result.URLS };
+    return { URLS: result.URLS, queueId:result.queueId  };
   } catch (error) {
     // Handle errors
     throw new Error(`${error.message} ${error.details || ""}`);
