@@ -19,7 +19,8 @@ const {
   isValidIssuer,
   holdExecution,
   validateSearchDateFormat,
-  isDBConnected // Function to check if the database connection is established
+  isDBConnected, // Function to check if the database connection is established
+  wipeSourceFile
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
 
 // Define the API endpoint and parameters
@@ -705,8 +706,61 @@ const adminSearchWithFilter = async (req, res) => {
     if (input && filter) {
       var filterCriteria = `$${filter}`;
       if (flag == 1) {
-        // Query 1
-        var query1Promise = Issues.find({
+        
+        // // Query 1
+        // var query1Promise = Issues.find({
+        //   issuerId: isEmailExist.issuerId,
+        //   $expr: {
+        //     $and: [
+        //       { $regexMatch: { input: { $toLower: filterCriteria }, regex: new RegExp(`^${input.toLowerCase()}`, 'i') } }
+        //     ]
+        //   },
+        //   certificateStatus: { $in: certStatusFilter },
+        //   expirationDate: { $ne: expirationDateFilter },
+        //   url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
+        // });
+
+        // // Query 2
+        // var query2Promise = BatchIssues.find({
+        //   issuerId: isEmailExist.issuerId,
+        //   $expr: {
+        //     $and: [
+        //       { $regexMatch: { input: { $toLower: filterCriteria }, regex: new RegExp(`^${input.toLowerCase()}`, 'i') } }
+        //     ]
+        //   },
+        //   certificateStatus: { $in: certStatusFilter },
+        //   expirationDate: { $ne: expirationDateFilter },
+        //   url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
+        // });
+
+        // // Query 3
+        // var query3Promise = DynamicIssues.find({
+        //   issuerId: isEmailExist.issuerId,
+        //   $expr: {
+        //     $and: [
+        //       { $regexMatch: { input: { $toLower: filterCriteria }, regex: new RegExp(`^${input.toLowerCase()}`, 'i') } }
+        //     ]
+        //   },
+        //   certificateStatus: { $in: certStatusFilter },
+        //   url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
+        // });
+
+        // // Query 4
+        // var query4Promise = DynamicBatchIssues.find({
+        //   issuerId: isEmailExist.issuerId,
+        //   $expr: {
+        //     $and: [
+        //       { $regexMatch: { input: { $toLower: filterCriteria }, regex: new RegExp(`^${input.toLowerCase()}`, 'i') } }
+        //     ]
+        //   },
+        //   certificateStatus: { $in: certStatusFilter },
+        //   url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
+        // });
+
+        // // Await both promises
+        // var [query1Result, query2Result, query3Result, query4Result] = await Promise.all([query1Promise, query2Promise, query3Promise, query4Promise]);
+        
+        const commonFilter = {
           issuerId: isEmailExist.issuerId,
           $expr: {
             $and: [
@@ -714,49 +768,17 @@ const adminSearchWithFilter = async (req, res) => {
             ]
           },
           certificateStatus: { $in: certStatusFilter },
-          expirationDate: { $ne: expirationDateFilter },
           url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-        });
+        };
 
-        // Query 2
-        var query2Promise = BatchIssues.find({
-          issuerId: isEmailExist.issuerId,
-          $expr: {
-            $and: [
-              { $regexMatch: { input: { $toLower: filterCriteria }, regex: new RegExp(`^${input.toLowerCase()}`, 'i') } }
-            ]
-          },
-          certificateStatus: { $in: certStatusFilter },
-          expirationDate: { $ne: expirationDateFilter },
-          url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-        });
-
-        // Query 3
-        var query3Promise = DynamicIssues.find({
-          issuerId: isEmailExist.issuerId,
-          $expr: {
-            $and: [
-              { $regexMatch: { input: { $toLower: filterCriteria }, regex: new RegExp(`^${input.toLowerCase()}`, 'i') } }
-            ]
-          },
-          certificateStatus: { $in: certStatusFilter },
-          url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-        });
-
-        // Query 4
-        var query4Promise = DynamicBatchIssues.find({
-          issuerId: isEmailExist.issuerId,
-          $expr: {
-            $and: [
-              { $regexMatch: { input: { $toLower: filterCriteria }, regex: new RegExp(`^${input.toLowerCase()}`, 'i') } }
-            ]
-          },
-          certificateStatus: { $in: certStatusFilter },
-          url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-        });
-
-        // Await both promises
-        var [query1Result, query2Result, query3Result, query4Result] = await Promise.all([query1Promise, query2Promise, query3Promise, query4Promise]);
+        // Fetch all issues across different models
+        var [query1Result, query2Result, query3Result, query4Result] = await Promise.all([
+          Issues.find(commonFilter, { issueDate: 1, certificateNumber: 1, grantDate: 1, expirationDate: 1, name: 1, url: 1 }).lean(),
+          BatchIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, grantDate: 1, expirationDate: 1, name: 1, url: 1 }).lean(),
+          DynamicIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, name: 1, url: 1 }).lean(),
+          DynamicBatchIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, name: 1, url: 1 }).lean()
+        ]);
+        
         // Check if results are non-empty and push to finalResults
         if (query1Result.length > 0) {
           fetchedIssues = fetchedIssues.concat(query1Result);
@@ -786,8 +808,57 @@ const adminSearchWithFilter = async (req, res) => {
 
       } else {
 
-        // Query 1
-        var query1Promise = Issues.find({
+        // // Query 1
+        // var query1Promise = Issues.find({
+        //   issuerId: isEmailExist.issuerId,
+        //   $expr: {
+        //     $and: [
+        //       { $eq: [{ $toLower: filterCriteria }, input.toLowerCase()] }
+        //     ]
+        //   },
+        //   certificateStatus: { $in: certStatusFilter },
+        //   expirationDate: { $ne: expirationDateFilter },
+        //   url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
+        // });
+
+        // // Query 2
+        // var query2Promise = BatchIssues.find({
+        //   issuerId: isEmailExist.issuerId,
+        //   $expr: {
+        //     $and: [
+        //       { $eq: [{ $toLower: filterCriteria }, input.toLowerCase()] }
+        //     ]
+        //   },
+        //   certificateStatus: { $in: certStatusFilter },
+        //   expirationDate: { $ne: expirationDateFilter },
+        //   url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
+        // });
+
+        // // Query 3
+        // var query3Promise = DynamicIssues.find({
+        //   issuerId: isEmailExist.issuerId,
+        //   $expr: {
+        //     $and: [
+        //       { $eq: [{ $toLower: filterCriteria }, input.toLowerCase()] }
+        //     ]
+        //   },
+        //   certificateStatus: { $in: certStatusFilter },
+        //   url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
+        // });
+
+        // // Query 4
+        // var query4Promise = DynamicBatchIssues.find({
+        //   issuerId: isEmailExist.issuerId,
+        //   $expr: {
+        //     $and: [
+        //       { $eq: [{ $toLower: filterCriteria }, input.toLowerCase()] }
+        //     ]
+        //   },
+        //   certificateStatus: { $in: certStatusFilter },
+        //   url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
+        // });
+        
+        const commonFilter = {
           issuerId: isEmailExist.issuerId,
           $expr: {
             $and: [
@@ -795,50 +866,19 @@ const adminSearchWithFilter = async (req, res) => {
             ]
           },
           certificateStatus: { $in: certStatusFilter },
-          expirationDate: { $ne: expirationDateFilter },
           url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-        });
+        };
 
-        // Query 2
-        var query2Promise = BatchIssues.find({
-          issuerId: isEmailExist.issuerId,
-          $expr: {
-            $and: [
-              { $eq: [{ $toLower: filterCriteria }, input.toLowerCase()] }
-            ]
-          },
-          certificateStatus: { $in: certStatusFilter },
-          expirationDate: { $ne: expirationDateFilter },
-          url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-        });
-
-        // Query 3
-        var query3Promise = DynamicIssues.find({
-          issuerId: isEmailExist.issuerId,
-          $expr: {
-            $and: [
-              { $eq: [{ $toLower: filterCriteria }, input.toLowerCase()] }
-            ]
-          },
-          certificateStatus: { $in: certStatusFilter },
-          url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-        });
-
-
-        // Query 4
-        var query4Promise = DynamicBatchIssues.find({
-          issuerId: isEmailExist.issuerId,
-          $expr: {
-            $and: [
-              { $eq: [{ $toLower: filterCriteria }, input.toLowerCase()] }
-            ]
-          },
-          certificateStatus: { $in: certStatusFilter },
-          url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
-        });
+        // Fetch all issues across different models
+        const [query1Result, query2Result, query3Result, query4Result] = await Promise.all([
+          Issues.find(commonFilter, { issueDate: 1, certificateNumber: 1, expirationDate: 1, name: 1, url: 1 }).lean(),
+          BatchIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, expirationDate: 1, name: 1, url: 1 }).lean(),
+          DynamicIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, name: 1, url: 1 }).lean(),
+          DynamicBatchIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, name: 1, url: 1 }).lean()
+        ]);
 
         // Await both promises
-        var [query1Result, query2Result, query3Result, query4Result] = await Promise.all([query1Promise, query2Promise, query3Promise, query4Promise]);
+        // var [query1Result, query2Result, query3Result, query4Result] = await Promise.all([query1Promise, query2Promise, query3Promise, query4Promise]);
         // Check if results are non-empty and push to finalResults
         if (query1Result.length > 0) {
           fetchedIssues = fetchedIssues.concat(query1Result);
@@ -940,18 +980,10 @@ const uploadFileToS3 = async (req, res) => {
     const data = await s3.upload(uploadParams).promise();
     console.log('File uploaded successfully to', data.Location);
     res.status(200).send({ code: 200, status: "SUCCESS", message: 'File uploaded successfully', fileUrl: data.Location });
-    // await cleanUploadFolder();
-    // Clean up the upload file
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    await wipeSourceFile(req.file.path);
   } catch (error) {
     console.error('Error uploading file:', error);
-    // await cleanUploadFolder();
-    // Clean up the upload file
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    await wipeSourceFile(req.file.path);
     res.status(500).send({ code: 500, status: "FAILED", error: 'An error occurred while uploading the file', details: error });
     return;
   }
@@ -1239,6 +1271,7 @@ const fetchIssuesLogDetails = async (req, res) => {
             issuerId: issuerExist.issuerId,
             certificateStatus: { $in: [1, 2, 4] },
             expirationDate: { $ne: "1" },
+            type: { $ne: "dynamic"},
             url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket }
           };
 
@@ -1268,7 +1301,6 @@ const fetchIssuesLogDetails = async (req, res) => {
 
           // Sort the data based on the 'issueDate' date in descending order
           // queryResponse.sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate));
-
           for (let item8 of queryResponse) {
             let certificateNumber = item8.certificateNumber;
             const issueStatus8 = await IssueStatus.findOne({ certificateNumber });
@@ -1724,18 +1756,10 @@ const uploadCertificateToS3 = async (req, res) => {
         break;
       default:
         console.error('Invalid type:', type);
-        // await cleanUploadFolder();
-        // Clean up the upload file
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-        }
+        await wipeSourceFile(req.file.path);
         return res.status(400).send({ code: 400, status: "FAILED", message: 'Invalid type' });
     }
-    // await cleanUploadFolder();
-    // Clean up the upload file
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    await wipeSourceFile(req.file.path);
     res.status(200).send({ code: 200, status: "SUCCESS", message: 'File uploaded successfully', fileUrl: data.Location });
     return;
   } catch (error) {
@@ -1866,8 +1890,10 @@ const getBatchCertificateDates = async (req, res) => {
     }
 
     // Fetch all batch certificates for the given issuerId
-    const batchCertificatesOne = await BatchIssues.find({ issuerId }).sort({ issueDate: 1 });
-    const batchCertificatesTwo = await DynamicBatchIssues.find({ issuerId }).sort({ issueDate: 1 });
+    // const batchCertificatesOne = await BatchIssues.find({ issuerId }).sort({ issueDate: 1 });
+    // const batchCertificatesTwo = await DynamicBatchIssues.find({ issuerId }).sort({ issueDate: 1 });
+    const batchCertificatesOne = await BatchIssues.find({ issuerId });
+    const batchCertificatesTwo = await DynamicBatchIssues.find({ issuerId });
 
     const batchCertificates = [...batchCertificatesOne, ...batchCertificatesTwo];
 

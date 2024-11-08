@@ -84,14 +84,14 @@ const mailOptions = {
   // Specify the sender's information
   from: {
     // Name of the sender
-    name: 'AICerts Admin',
+    name: 'Certs365 Admin',
     // Sender's email address (obtained from environment variable)
     address: process.env.USER_MAIL,
   },
   // Specify the recipient's email address (to be filled dynamically)
   to: '', // replace with recipient's email address
   // Subject line of the email
-  subject: 'AICerts Admin Notification',
+  subject: 'Certs365 Admin Notification',
   // Plain text content of the email body (to be filled dynamically)
   text: '', // replace with text content of the email body
 };
@@ -515,36 +515,8 @@ const isCertificationIdExisted = async (certId) => {
   }
 };
 
-const isBulkCertificationIdExisted = async (certId) => {
-  await isDBConnected();
-
-  if (certId == null || certId == "") {
-    return null;
-  }
-
-  const singleIssueExist = await DynamicIssues.findOne({ certificateNumber: certId });
-  const batchIssueExist = await DynamicBatchIssues.findOne({ certificateNumber: certId });
-
-  try {
-    if (singleIssueExist) {
-
-      return singleIssueExist;
-    } else if (batchIssueExist) {
-
-      return batchIssueExist;
-    } else {
-
-      return null;
-    }
-
-  } catch (error) {
-    console.error("Error during validation:", error);
-    return null;
-  }
-};
-
 const isDynamicCertificationIdExisted = async (certId) => {
-  const dbStaus = await isDBConnected();
+  await isDBConnected();
 
   if (certId == null || certId == "") {
     return null;
@@ -610,14 +582,14 @@ const insertIssuanceCertificateData = async (data) => {
   try {
     // Create a new Issues document with the provided data
     const newIssue = new Issues({
-      issuerId: data.issuerId,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
-      course: data.course,
-      grantDate: data.grantDate,
-      expirationDate: data.expirationDate,
+      issuerId: data?.issuerId,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
+      course: data?.course,
+      grantDate: data?.grantDate,
+      expirationDate: data?.expirationDate,
       certificateStatus: 6,
       issueDate: Date.now() // Set the issue date to the current timestamp
     });
@@ -657,23 +629,23 @@ const insertCertificateData = async (data) => {
   try {
     // Create a new Issues document with the provided data
     const newIssue = new Issues({
-      issuerId: data.issuerId,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
-      course: data.course,
-      grantDate: data.grantDate,
-      expirationDate: data.expirationDate,
-      certificateStatus: data.certStatus,
-      positionX: data.positionX,
-      positionY: data.positionY,
-      qrSize: data.qrSize,
-      width: data.width || without_pdf_width,
-      height: data.height || without_pdf_height,
-      qrOption: data.qrOption || 0,
-      url: data.url || '',
-      type: data.type || '',
+      issuerId: data?.issuerId,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
+      course: data?.course,
+      grantDate: data?.grantDate,
+      expirationDate: data?.expirationDate,
+      certificateStatus: data?.certStatus,
+      positionX: data?.positionX,
+      positionY: data?.positionY,
+      qrSize: data?.qrSize,
+      width: data?.width || without_pdf_width,
+      height: data?.height || without_pdf_height,
+      qrOption: data?.qrOption || 0,
+      url: data?.url || '',
+      type: data?.type || '',
       issueDate: Date.now() // Set the issue date to the current timestamp
     });
 
@@ -707,20 +679,20 @@ const insertDynamicCertificateData = async (data) => {
   try {
     // Create a new Issues document with the provided data
     const newDynamicIssue = new DynamicIssues({
-      issuerId: data.issuerId,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
+      issuerId: data?.issuerId,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
       certificateStatus: 1,
-      positionX: data.positionX,
-      positionY: data.positionY,
-      qrSize: data.qrSize,
+      positionX: data?.positionX,
+      positionY: data?.positionY,
+      qrSize: data?.qrSize,
       certificateFields: data.customFields,
-      width: data.width || without_pdf_width,
-      height: data.height || without_pdf_height,
-      qrOption: data.qrOption || 0,
-      url: data.url,
+      width: data?.width || without_pdf_width,
+      height: data?.height || without_pdf_height,
+      qrOption: data?.qrOption || 0,
+      url: data?.url,
       type: 'dynamic',
       issueDate: Date.now() // Set the issue date to the current timestamp
     });
@@ -757,24 +729,24 @@ const insertBatchCertificateData = async (data) => {
   try {
     // Insert data into MongoDB
     const newBatchIssue = new BatchIssues({
-      issuerId: data.issuerId,
-      batchId: data.batchId,
-      proofHash: data.proofHash,
-      encodedProof: data.encodedProof,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
-      course: data.course,
-      grantDate: data.grantDate,
-      expirationDate: data.expirationDate,
-      certificateStatus: data.certStatus,
-      positionX: data.positionX,
-      positionY: data.positionY,
-      qrSize: data.qrSize,
-      width: data.width || without_pdf_width,
-      height: data.height || without_pdf_height,
-      qrOption: data.qrOption || 0,
+      issuerId: data?.issuerId,
+      batchId: data?.batchId,
+      proofHash: data?.proofHash,
+      encodedProof: data?.encodedProof,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
+      course: data?.course,
+      grantDate: data?.grantDate,
+      expirationDate: data?.expirationDate,
+      certificateStatus: data?.certStatus || 1,
+      positionX: data?.positionX,
+      positionY: data?.positionY,
+      qrSize: data?.qrSize,
+      width: data?.width || without_pdf_width,
+      height: data?.height || without_pdf_height,
+      qrOption: data?.qrOption || 0,
       issueDate: Date.now()
     });
 
@@ -803,23 +775,23 @@ const insertDynamicBatchCertificateData = async (data) => {
 
     // Insert data into MongoDB
     const newBatchIssue = new DynamicBatchIssues({
-      issuerId: data.issuerId,
-      batchId: data.batchId,
-      proofHash: data.proofHash,
-      encodedProof: data.encodedProof,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
+      issuerId: data?.issuerId,
+      batchId: data?.batchId,
+      proofHash: data?.proofHash,
+      encodedProof: data?.encodedProof,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
       certificateFields: data.customFields,
       certificateStatus: 1,
-      positionX: data.positionX,
-      positionY: data.positionY,
-      qrSize: data.qrSize,
-      width: data.width || without_pdf_width,
-      height: data.height || without_pdf_height,
-      qrOption: data.qrOption || 0,
-      url: data.url || '',
+      positionX: data?.positionX,
+      positionY: data?.positionY,
+      qrSize: data?.qrSize,
+      width: data?.width || without_pdf_width,
+      height: data?.height || without_pdf_height,
+      qrOption: data?.qrOption || 0,
+      url: data?.url || '',
       type: 'dynamic',
       issueDate: Date.now()
     });
@@ -857,11 +829,11 @@ const insertIssueStatus = async (issueData) => {
       issuerId: issuerId, // ID field is of type String and is required
       batchId: batchId,
       transactionHash: transactionHash, // TransactionHash field is of type String and is required
-      certificateNumber: issueData.certificateNumber, // CertificateNumber field is of type String and is required
+      certificateNumber: issueData?.certificateNumber, // CertificateNumber field is of type String and is required
       course: issueData.course,
-      name: issueData.name,
+      name: issueData?.name,
       expirationDate: formattedDate, // ExpirationDate field is of type String and is required
-      certStatus: issueData.certStatus,
+      certStatus: issueData?.certStatus,
       lastUpdate: Date.now()
     });
     const updateLog = await newIssueStatus.save();
@@ -1529,71 +1501,116 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const cleanUploadFolder = async () => {
-  const uploadFolder = '../uploads'; // Specify the folder path you want
-  const folderPath = path.join(__dirname, '..', uploadFolder);
+// Function to delete all empty folders (in provided path)
+const removeEmptyFolders = async (dir) => {
+  try {
+    // Read the contents of the directory
+    const files = fs.readdirSync(dir);
 
-  // Check if the folder is not empty
-  const filesInFolder = fs.readdirSync(folderPath);
+    // Loop through each file and directory
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      const stats = fs.statSync(filePath);
 
-  if (filesInFolder.length > 0) {
-    // Delete all files in the folder
-    filesInFolder.forEach(fileToDelete => {
-      const filePathToDelete = path.join(folderPath, fileToDelete);
-      try {
-        fs.unlinkSync(filePathToDelete);
-      } catch (error) {
-        console.error("Error deleting file:", filePathToDelete, error);
-      }
-    });
-  }
-};
+      // If it's a directory, recursively check for empty folders
+      if (stats.isDirectory()) {
+        await removeEmptyFolders(filePath); // Recursive call
 
-const flushUploadFolder = async () => {
-  const uploadFolder = '../uploads'; // Specify the folder path you want
-  const folderPath = path.join(__dirname, '..', uploadFolder);
-
-  // Check if the folder is not empty
-  const filesInFolder = fs.readdirSync(folderPath);
-
-  const fileToDelete = filesInFolder[0]; // Get the first file in the folder
-  const filePathToDelete = path.join(folderPath, fileToDelete); // Construct the full path of the file to delete
-
-  // Delete the file
-  fs.unlink(filePathToDelete, (err) => {
-    if (err) {
-      console.error(`Error deleting file "${filePathToDelete}":`, err);
-    } else {
-      console.log(`Only Files in "${filePathToDelete}" were deleted successfully.`);
-    }
-  });
-};
-
-const wipeUploadFolder = async () => {
-  const uploadFolder = '../uploads'; // Specify the folder path you want
-  const folderPath = path.join(__dirname, '..', uploadFolder);
-
-  // Check if the folder is not empty
-  const filesInFolder = fs.readdirSync(folderPath);
-
-  if (filesInFolder.length > 0) {
-    // Delete all files in the folder
-    filesInFolder.forEach(fileToDelete => {
-      const filePathToDelete = path.join(folderPath, fileToDelete);
-      try {
-        if (fs.lstatSync(filePathToDelete).isDirectory()) {
-          // If it's a directory, recursively delete it
-          fs.rmSync(filePathToDelete, { recursive: true });
-        } else {
-          // If it's a file, just delete it
-          fs.unlinkSync(filePathToDelete);
+        // Recheck if the folder is empty after processing subdirectories
+        if (fs.existsSync(filePath) && fs.readdirSync(filePath).length === 0) {
+          fs.rmdirSync(filePath);
+          console.log(`Removed empty folder: ${filePath}`);
         }
-      } catch (error) {
-        console.error("Error deleting file:", filePathToDelete, error);
       }
-    });
+    }
+
+    // Finally, check if the root directory itself is empty
+    if (fs.existsSync(dir) && fs.readdirSync(dir).length === 0) {
+      fs.rmdirSync(dir);
+      console.log(`Removed root empty folder: ${dir}`);
+    }
+
+  } catch (error) {
+    console.error(`Error removing folder ${dir}: ${error.message}`);
   }
 };
+
+// Function to list down all existed pdf files in the given path (folder)
+const getPdfFiles = async (folderPath) => {
+  try {
+    // Initialize an array to store only PDF files
+    const pdfFilesList = [];
+
+    // Read all files in the specified folder
+    const files = fs.readdirSync(folderPath);
+
+    // Filter for files with .pdf extension and push them into the array
+    files.forEach(file => {
+      if (path.extname(file).toLowerCase() === '.pdf') {
+        pdfFilesList.push(file);
+      }
+    });
+
+    // Return the list of PDF files
+    return pdfFilesList;
+
+  } catch (err) {
+    console.error("Error reading directory:", err);
+    return [];
+  }
+}
+
+const wipeSourceFolder = async (_path) => {
+  const folderPath = path.join(__dirname, '../../uploads', _path);
+  console.log("Input folder path", folderPath);
+  // Check if the folder exists
+  if (fs.existsSync(folderPath)) {
+    try {
+      // Delete the entire folder
+      fs.rmSync(folderPath, { recursive: true, force: true });
+      console.log(`Source folder deleted: ${folderPath}`);
+    } catch (error) {
+      console.error("Error deleting folder:", folderPath, error);
+    }
+  } else {
+    console.log(`Folder does not exist: ${folderPath}`);
+  }
+};
+
+const wipeSourceFile = async (_path) => {
+  try {
+    // Check if the file exists before attempting to delete it
+    if (fs.existsSync(_path)) {
+      fs.unlinkSync(_path);
+      console.log(`Deleted source zip file: ${_path}`);
+    } else {
+      console.log(`File does not exist: ${_path}`);
+    }
+  } catch (err) {
+    console.error('Error deleting the zip file:', err);
+  }
+};
+
+// Function to rename upload PDF file
+const renameUploadPdfFile = async (oldFilePath) => {
+  if (!oldFilePath) {
+    return null;
+  }
+  try {
+    // Define a new file name, keeping the same directory path as the original file
+    let getRandomId = Math.floor(10000 + Math.random() * 90000);
+    let newFileName = `${getRandomId}_${Date.now()}.pdf`;
+    let directoryPath = path.dirname(oldFilePath);
+    let newFilePath = path.join(directoryPath, newFileName);
+
+    // Rename the file by replacing the original file path with the new file name
+    fs.renameSync(oldFilePath, newFilePath);
+    return newFilePath;
+  } catch (error) {
+    console.error("Error occuered while renaming PDF file", error);
+    return null;
+  }
+}
 
 const isDBConnected = async (maxRetries = 5, retryDelay = 1500) => {
   let retryCount = 0;
@@ -1619,7 +1636,7 @@ const sendEmail = async (name, email) => {
   try {
     // Update the mailOptions object with the recipient's email address and email body
     mailOptions.to = email;
-    mailOptions.subject = `Your AICerts Account is Approved!`;
+    mailOptions.subject = `Your Certs365 Account is Approved!`;
     mailOptions.text = `Hi ${name},
 
 Congratulations! Your account has been successfully approved by our admin team.
@@ -1629,7 +1646,7 @@ You can now log in to your profile using your username ${email}. We are excited 
 If you have any questions or need assistance, feel free to reach out.
 
 Best regards,
-The AICerts Team.`;
+The Certs365 Team.`;
 
     // Send the email using the configured transporter
     transporter.sendMail(mailOptions);
@@ -1651,7 +1668,7 @@ const rejectEmail = async (name, email) => {
   try {
     // Update the mailOptions object with the recipient's email address and email body
     mailOptions.to = email;
-    mailOptions.subject = `Your AICerts Account Registration Status`;
+    mailOptions.subject = `Your Certs365 Account Registration Status`;
     mailOptions.text = `Hi ${name},
 
 We regret to inform you that your account registration has been declined by our admin team.
@@ -1659,7 +1676,7 @@ We regret to inform you that your account registration has been declined by our 
 If you have any questions or need further clarification, please do not hesitate to contact us. Thank you for your interest in AICerts.
 
 Best regards,
-The AICerts Team.`;
+The Certs365 Team.`;
 
     // Send the email using the configured transporter
     transporter.sendMail(mailOptions);
@@ -1718,7 +1735,7 @@ const getCertificationStatus = async (certStatus) => {
 const getContractAddress = async (contractAddress, maxRetries = 3, delay = 1000) => {
   let attempt = 0;
 
-  if(contractAddress){
+  if (contractAddress) {
     console.log('RPC provider responding');
     return true;
   }
@@ -1750,7 +1767,7 @@ const getContractAddress = async (contractAddress, maxRetries = 3, delay = 1000)
 };
 
 const checkTransactionStatus = async (transactionHash) => {
-  if(transactionHash){
+  if (transactionHash) {
     return true;
   }
   try {
@@ -1810,8 +1827,21 @@ const getLatestTransferDate = async (address) => {
   }
 };
 
+// Function to generate custom folder
+const generateCustomFolder = async (folderName) => {
+  try {
+    let currentDate = Date.now().toString();
+    let croppedDate = currentDate.slice(-5);
+    let customFolderName = folderName + croppedDate;
+    return customFolderName;
+  } catch (error) {
+    console.error("Error occuered while generating custom folder name", error);
+  }
+}
+
 module.exports = {
 
+  // Fallback object contains provider
   fallbackProvider,
 
   // Function to validate issuer by email
@@ -1832,8 +1862,6 @@ module.exports = {
   isCertificationIdExisted,
 
   // Verify Certification ID from both dynamic bulk collections (single / batch)
-  isBulkCertificationIdExisted,
-
   isDynamicCertificationIdExisted,
 
   // Function to insert single certificate data into MongoDB
@@ -1919,14 +1947,20 @@ module.exports = {
   // Function for filtering file uploads based on MIME type Pdf
   fileFilter,
 
-  // Function to clean up the data in upload folder
-  cleanUploadFolder,
+  // Function to wipeout folders in upload folder
+  wipeSourceFolder,
 
-  // Function to flush files in upload folder
-  flushUploadFolder,
+  // Function to wipe file (in the given file path)
+  wipeSourceFile,
 
-  // Function to wipout folders in upload folder
-  wipeUploadFolder,
+  // Function to rename the uploaded file (path)
+  renameUploadPdfFile,
+
+  // Function to delete empty folders (given directory path)
+  removeEmptyFolders,
+
+  // Function to get all pdf files in the directory (given)
+  getPdfFiles,
 
   // Function to check if MongoDB is connected
   isDBConnected,
@@ -1949,4 +1983,6 @@ module.exports = {
   getPdfDimensions,
 
   getLatestTransferDate,
+
+  generateCustomFolder,
 };

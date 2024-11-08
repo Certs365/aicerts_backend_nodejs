@@ -191,7 +191,7 @@ router.post('/validate-issuer', validationRoute.validateIssuer, adminController.
  *                   description: Error message indicating an error during the allocation process.
  */
 
-router.post('/allocate-credits', validationRoute.validateCredits, ensureAuthenticated, adminController.allocateCredits);
+router.post('/allocate-credits', validationRoute.validateCredits, adminController.allocateCredits);
 
 /**
  * @swagger

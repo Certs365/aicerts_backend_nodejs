@@ -23,7 +23,7 @@ const {
     isDBConnected,
     getIssuerServiceCredits,
     updateIssuerServiceCredits,
-    cleanUploadFolder
+    wipeSourceFile
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
 
 const { convertToExcel } = require('../dist/convert');
@@ -289,7 +289,7 @@ const convertIntoExcel = async (req, res) => {
     if (!req.file) {
         // File path does not match the pattern
         let errorMessage = messageCode.msgInvalidFile;
-        await cleanUploadFolder();
+        await wipeSourceFile(req.file.path);
         res.status(400).json({ code: 400, status: "FAILED", message: errorMessage, details: req.file });
         return;
     }
@@ -315,10 +315,10 @@ const convertIntoExcel = async (req, res) => {
 
             if (!targetFileBuffer || targetFileBuffer == null) {
                 res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgUnableToConvert });
-                await cleanUploadFolder();
+                await wipeSourceFile(req.file.path);
                 return;
             }
-            await cleanUploadFolder();
+            await wipeSourceFile(req.file.path);
 
             const resultExcel = `converted.xlsx`;
 
@@ -332,7 +332,7 @@ const convertIntoExcel = async (req, res) => {
             return;
         }
     } catch (error) {
-        await cleanUploadFolder();
+        await wipeSourceFile(req.file.path);
         res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
         return;
     }
@@ -423,7 +423,6 @@ const generateExcelReport = async (req, res) => {
             }
         }
     } catch (error) {
-        await cleanUploadFolder();
         res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
         return;
     }

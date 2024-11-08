@@ -12,46 +12,21 @@ const { decryptData, generateEncryptedUrl } = require("../common/cryptoFunction"
 const pdf = require("pdf-lib"); // Library for creating and modifying PDF documents
 const { PDFDocument } = pdf;
 
-// Import MongoDB models
-const { ShortUrl, DynamicIssues, DynamicBatchIssues } = require("../config/schema");
-
-// Import ABI (Application Binary Interface) from the JSON file located at "../config/abi.json"
-const abi = require("../config/abi.json");
-
 // Importing functions from a custom module
 const {
   connectToPolygon,
   extractQRCodeDataFromPDF, // Function to extract QR code data from a PDF file
-  cleanUploadFolder, // Function to clean up the upload folder
   isDBConnected, // Function to check if the database connection is established
   extractCertificateInfo,
   extractCertificateInformation,
   verificationLogEntry,
   isCertificationIdExisted,
-  isBulkCertificationIdExisted,
   isDynamicCertificationIdExisted,
   holdExecution,
-  checkTransactionStatus
+  checkTransactionStatus,
+  renameUploadPdfFile,
+  wipeSourceFile
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
-
-// Retrieve contract address from environment variable
-const contractAddress = process.env.CONTRACT_ADDRESS;
-
-// Define an array of providers to use as fallbacks
-const providers = [
-  new ethers.AlchemyProvider(process.env.RPC_NETWORK, process.env.ALCHEMY_API_KEY),
-  new ethers.InfuraProvider(process.env.RPC_NETWORK, process.env.INFURA_API_KEY)
-  // Add more providers as needed
-];
-
-// Create a new FallbackProvider instance
-const fallbackProvider = new ethers.FallbackProvider(providers);
-
-// Create a new ethers signer instance using the private key from environment variable and the provider(Fallback)
-const signer = new ethers.Wallet(process.env.PRIVATE_KEY, fallbackProvider);
-
-// Create a new ethers contract instance with a signing capability (using the contract Address, ABI and signer)
-const newContract = new ethers.Contract(contractAddress, abi, signer);
 
 var messageCode = require("../common/codes");
 const e = require('express');
@@ -67,7 +42,7 @@ const urlLimit = process.env.MAX_URL_SIZE || 50;
  */
 const verify = async (req, res) => {
   // Extracting file path from the request
-  const file = req?.file.path;
+  var file = req?.file.path;
   console.log("file path", req.file.path);
   var fileBuffer = fs.readFileSync(file);
   var pdfDoc = await PDFDocument.load(fileBuffer);
@@ -83,27 +58,24 @@ const verify = async (req, res) => {
     return `${month}/${day}/${year}`;
   };
   const todayDate = await getTodayDate();
+  // Rename the file by replacing the original file path with the new file name
+  const newFilePath = await renameUploadPdfFile(file);
+  if (newFilePath) {
+    // Update req.file.path to reflect the new file path
+    req.file.path = newFilePath;
+  }
 
   if (pdfDoc.getPageCount() > 1) {
-    // Respond with success status and certificate details
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
-    // Clean up the upload folder
-    // await cleanUploadFolder();
+    await wipeSourceFile(req.file.path);
     return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgMultiPagePdf });
   }
 
   try {
     // Extract QR code data from the PDF file
-    const certificateData = await extractQRCodeDataFromPDF(file);
+    const certificateData = await extractQRCodeDataFromPDF(req.file.path);
 
     if (certificateData == false) {
-      if (fs.existsSync(file)) {
-        fs.unlinkSync(file);
-      }
-      // Clean up the upload folder
-      // await cleanUploadFolder();
+      await wipeSourceFile(req.file.path);
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertNotValid });
     }
 
@@ -118,9 +90,6 @@ const verify = async (req, res) => {
         try {
           await isDBConnected();
           var isIdExist = await isCertificationIdExisted(certificationNumber);
-          // if (!isIdExist) {
-          //   isIdExist = await isBulkCertificationIdExisted(certificationNumber);
-          // }
           if (isIdExist) {
             var blockchainResponse = 0;
             if (isIdExist.batchId == undefined) {
@@ -138,9 +107,7 @@ const verify = async (req, res) => {
               } else if (blockchainResponse == 3) {
                 verificationResponse = messageCode.msgCertRevoked;
               }
-              if (fs.existsSync(file)) {
-                fs.unlinkSync(file);
-              }
+              await wipeSourceFile(req.file.path);
               return res.status(400).json({ code: 400, status: "FAILED", message: verificationResponse });
             }
           }
@@ -166,12 +133,7 @@ const verify = async (req, res) => {
               } else {
                 completeResponse.url = null;
               }
-              if (fs.existsSync(file)) {
-                fs.unlinkSync(file);
-              }
-              // Clean up the upload folder
-              // await cleanUploadFolder();
-
+              await wipeSourceFile(req.file.path);
               res.status(200).json({
                 code: 200,
                 status: "SUCCESS",
@@ -194,11 +156,7 @@ const verify = async (req, res) => {
               "certificateUrl": certUrl
             }
             if (isIdExist.certificateStatus == 3) {
-              if (fs.existsSync(file)) {
-                fs.unlinkSync(file);
-              }
-              // Clean up the upload folder
-              // await cleanUploadFolder();
+              await wipeSourceFile(req.file.path);
               return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertRevoked });
             }
 
@@ -212,11 +170,7 @@ const verify = async (req, res) => {
               course: isIdExist.course,
             };
             await verificationLogEntry(verifyLog);
-            if (fs.existsSync(file)) {
-              fs.unlinkSync(file);
-            }
-            // Clean up the upload folder
-            // await cleanUploadFolder();
+            await wipeSourceFile(req.file.path);
             return res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgCertValid, details: formattedResponse });
 
           } else if (isDynamicCertificateExist) {
@@ -232,23 +186,15 @@ const verify = async (req, res) => {
               "certificateUrl": isDynamicCertificateExist.url
             }
 
-            if (fs.existsSync(file)) {
-              fs.unlinkSync(file);
-            }
-            // Clean up the upload folder
-            // await cleanUploadFolder();
+            await wipeSourceFile(req.file.path);
             return res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgCertValid, details: formattedDynamicResponse });
           } else {
-            if (fs.existsSync(file)) {
-              fs.unlinkSync(file);
-            }
+            await wipeSourceFile(req.file.path);
             return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
           }
 
         } catch (error) {
-          if (fs.existsSync(file)) {
-            fs.unlinkSync(file);
-          }
+          await wipeSourceFile(req.file.path);
           return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert, details: error });
         }
       }
@@ -263,7 +209,7 @@ const verify = async (req, res) => {
           if (dbStatus) {
             var getCertificationInfo = await isCertificationIdExisted(extractQRData['Certificate Number']);
             if (!getCertificationInfo) {
-              getCertificationInfo = await isBulkCertificationIdExisted(extractQRData['Certificate Number']);
+              getCertificationInfo = await isDynamicCertificationIdExisted(extractQRData['Certificate Number']);
             }
             if (extractQRData && !getCertificationInfo) {
               let transactionHash = extractQRData["Polygon URL"].split('/').pop();
@@ -273,9 +219,7 @@ const verify = async (req, res) => {
               }
               extractQRData.certificateUrl = null;
               res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgCertValid, details: extractQRData });
-              if (fs.existsSync(file)) {
-                fs.unlinkSync(file);
-              }
+              await wipeSourceFile(req.file.path);
               return;
             }
             certificateS3Url = null;
@@ -283,29 +227,17 @@ const verify = async (req, res) => {
               certificateS3Url = getCertificationInfo.url != null ? getCertificationInfo.url : null;
               var formatCertificationStatus = parseInt(getCertificationInfo.certificateStatus);
               if (formatCertificationStatus && formatCertificationStatus == 3) {
-                if (fs.existsSync(file)) {
-                  fs.unlinkSync(file);
-                }
-                // Clean up the upload folder
-                // await cleanUploadFolder();
+                await wipeSourceFile(req.file.path);
                 return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertRevoked });
               }
             }
           }
         } catch (error) {
-          if (fs.existsSync(file)) {
-            fs.unlinkSync(file);
-          }
-          // Clean up the upload folder
-          // await cleanUploadFolder();
+          await wipeSourceFile(req.file.path);
           return res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
         }
         extractQRData.url = !encodedUrl ? null : process.env.SHORT_URL + extractQRData['Certificate Number'];
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-        }
-        // Clean up the upload folder
-        // await cleanUploadFolder();
+        await wipeSourceFile(file);
         // Extract the transaction hash from the URL
         let transactionHash = certificateInfo["Polygon URL"].split('/').pop();
         if (transactionHash) {
@@ -315,13 +247,10 @@ const verify = async (req, res) => {
 
         extractQRData.certificateUrl = certificateS3Url;
         res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgCertValid, details: extractQRData });
+        await wipeSourceFile(req.file.path);
         return;
       }
-      if (fs.existsSync(file)) {
-        fs.unlinkSync(file);
-      }
-      // Clean up the upload folder
-      // await cleanUploadFolder();
+      await wipeSourceFile(req.file.path);
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
     } else if (certificateData.startsWith(process.env.START_LMS)) {
       var [extractQRData, encodedUrl] = await extractCertificateInfo(certificateData);
@@ -329,11 +258,7 @@ const verify = async (req, res) => {
         extractQRData = await extractCertificateInformation(certificateData);
       }
       if (extractQRData["Polygon URL"] == undefined) {
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-        }
-        // Clean up the upload folder
-        // await cleanUploadFolder();
+        await wipeSourceFile(req.file.path);
         return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
       }
       if (extractQRData) {
@@ -343,11 +268,7 @@ const verify = async (req, res) => {
         };
         await verificationLogEntry(verifyLog);
 
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-        }
-        // Clean up the upload folder
-        // await cleanUploadFolder();
+        await wipeSourceFile(req.file.path);
         extractQRData["Polygon URL"] = await modifyPolygonURL(extractQRData["Polygon URL"]);
         // Extract the transaction hash from the URL
         let transactionHash = extractQRData["Polygon URL"].split('/').pop();
@@ -356,22 +277,14 @@ const verify = async (req, res) => {
           extractQRData.blockchainStatus = txStatus;
         }
         res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgCertValid, details: extractQRData });
+        await wipeSourceFile(req.file.path);
         return;
       }
-      // Clean up the upload folder
-      // await cleanUploadFolder();
-      if (fs.existsSync(file)) {
-        fs.unlinkSync(file);
-      }
+      await wipeSourceFile(req.file.path);
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
 
     } else {
-      // Clean up the upload folder
-      // await cleanUploadFolder();
-      // Clean up the upload file
-      if (fs.existsSync(file)) {
-        fs.unlinkSync(file);
-      }
+      await wipeSourceFile(req.file.path);
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
     }
 
@@ -384,12 +297,7 @@ const verify = async (req, res) => {
     };
 
     res.status(400).json(verificationResponse);
-    // Clean up the upload file
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
-    // Clean up the upload folder
-    // await cleanUploadFolder();
+    await wipeSourceFile(req.file.path);
     return;
   }
 };
@@ -427,9 +335,6 @@ const decodeQRScan = async (req, res) => {
         try {
           await isDBConnected();
           var isIdExist = await isCertificationIdExisted(certificationNumber);
-          // if (!isIdExist) {
-          //   isIdExist = await isBulkCertificationIdExisted(certificationNumber);
-          // }
           if (isIdExist) {
             var blockchainResponse = 0;
             if (isIdExist.batchId == undefined) {
@@ -515,7 +420,7 @@ const decodeQRScan = async (req, res) => {
           if (dbStatus) {
             var getCertificationInfo = await isCertificationIdExisted(extractQRData['Certificate Number']);
             if (!getCertificationInfo) {
-              getCertificationInfo = await isBulkCertificationIdExisted(extractQRData['Certificate Number']);
+              getCertificationInfo = await isDynamicCertificationIdExisted(extractQRData['Certificate Number']);
             }
             certificateS3Url = null;
             if (getCertificationInfo) {
@@ -610,7 +515,7 @@ const decodeCertificate = async (req, res) => {
 
       var getCertificationInfo = await isCertificationIdExisted(parsedData['Certificate Number']);
       if (!getCertificationInfo) {
-        getCertificationInfo = await isBulkCertificationIdExisted(parsedData['Certificate Number']);
+        getCertificationInfo = await isDynamicCertificationIdExisted(parsedData['Certificate Number']);
       }
 
       var verifyLog = {
@@ -623,7 +528,7 @@ const decodeCertificate = async (req, res) => {
       if (dbStatus) {
         var getValidCertificatioInfo = await isCertificationIdExisted(originalData.Certificate_Number);
         if (!getValidCertificatioInfo) {
-          getValidCertificatioInfo = await isBulkCertificationIdExisted(originalData.Certificate_Number);
+          getValidCertificatioInfo = await isDynamicCertificationIdExisted(originalData.Certificate_Number);
         }
         if (getValidCertificatioInfo) {
           certificateS3Url = getValidCertificatioInfo.url != null ? getValidCertificatioInfo.url : null;
@@ -686,9 +591,6 @@ const verifyCertificationId = async (req, res) => {
     try {
       await isDBConnected();
       var isIdExist = await isCertificationIdExisted(inputId);
-      // if (!isIdExist) {
-      //   isIdExist = await isBulkCertificationIdExisted(inputId);
-      // }
       if (isIdExist) {
         var blockchainResponse = 0;
         if (isIdExist.batchId == undefined) {
@@ -726,8 +628,6 @@ const verifyCertificationId = async (req, res) => {
 
           let inputFileExist = await hasFilesInDirectory(uploadsPath);
           if (inputFileExist) {
-            // Clean up the upload folder
-            await cleanUploadFolder();
           }
 
           let txStatus = await checkTransactionStatus(isIdExist.transactionHash);
@@ -765,8 +665,6 @@ const verifyCertificationId = async (req, res) => {
         await verificationLogEntry(verifyLog);
         let inputFileExist = await hasFilesInDirectory(uploadsPath);
         if (inputFileExist) {
-          // Clean up the upload folder
-          await cleanUploadFolder();
         }
 
         let txStatus = await checkTransactionStatus(isIdExist.transactionHash);
@@ -788,8 +686,6 @@ const verifyCertificationId = async (req, res) => {
         }
         let inputFileExist = await hasFilesInDirectory(uploadsPath);
         if (inputFileExist) {
-          // Clean up the upload folder
-          // await cleanUploadFolder();
         }
 
         if(isDynamicCertificateExist.certificateStatus == 3){

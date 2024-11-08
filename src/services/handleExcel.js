@@ -6,8 +6,8 @@ const path = require("path");
 // Importing functions from a custom module
 const {
   isCertificationIdExisted,
-  isBulkCertificationIdExisted,
-  wipeUploadFolder,
+  wipeSourceFolder,
+  generateCustomFolder,
 } = require("../model/tasks"); // Importing functions from the '../model/tasks' module
 
 // Import MongoDB models
@@ -43,7 +43,7 @@ const expectedBulkHeadersSchema = [
 ];
 
 const messageCode = require("../common/codes");
-const { cleanUpJobs, addJobsInChunks, processExcelJob, cleanRedis } = require("../queue_service/queueUtils");
+const { cleanUpJobs, _cleanUpJobs, addJobsInChunks, processExcelJob, cleanRedis } = require("../queue_service/queueUtils");
 
 const handleExcelFile = async (_path) => {
   if (!_path) {
@@ -421,6 +421,7 @@ const failedErrorObject = {
   message: "",
   Details: [],
 };
+
 const processListener = async (job) => {
   try {
     const result = await processExcelJob(job);
@@ -455,6 +456,10 @@ const handleBatchExcelFile = async (_path, issuer) => {
       message: "Failed to provide excel file",
     };
   }
+  // Extract the folder name
+  const folderName = path.basename(path.dirname(_path));
+  var jobId = 0;
+
   // api to fetch excel data into json
   const newPath = path.join(..._path.split("\\"));
   const sheetNames = await readXlsxFile.readSheetNames(newPath);
@@ -561,22 +566,30 @@ const handleBatchExcelFile = async (_path, issuer) => {
         const repetitiveNumbers = await findRepetitiveIdNumbers(documentIDs);
         if (repetitiveNumbers.length > 0) {
           return { status: "FAILED", response: false, message: messageCode.msgExcelRepetetionIds, Details: repetitiveNumbers };
-      }
+        }
 
         const chunkSize = parseInt(process.env.EXCEL_CHUNK);
         const concurrency = parseInt(process.env.EXCEL_CONC);
         console.log(`chunk size : ${chunkSize} concurrency : ${concurrency}`);
-        // Generate a batchId for this job processing
-        const issuerId = new Date().getTime(); // Unique identifier (you can use other approaches too)
 
+        // Generate a batchId for this job processing
+        // const issuerId = new Date().getTime(); // Unique identifier (you can use other approaches too)
+        // Generate a random 6-digit number
+        const generatedJobId = Math.floor(100000 + Math.random() * 900000);
+        var issuerId = await generateCustomFolder(generatedJobId); // Unique identifier (you can use other approaches too)
+        // Unique ID for each call
+        // var issuerId = uuidv4();
+        console.log("The pocess ID", issuerId);
         const redisConfig = {
           redis: {
             port: process.env.REDIS_PORT || 6379, // Redis port (6380 from your env)
             host: process.env.REDIS_HOST || "localhost", // Redis host (127.0.0.1 from your env)
           },
         };
-        await cleanRedis(redisConfig)
-        const queueName = `bulkIssueExcelQueueProcessor${issuer}`;
+        // await cleanRedis(redisConfig);
+
+        // Create a unique queue name for each issuerId to handle concurrency
+        const queueName = `bulkIssueExcelQueueProcessor${issuerId}`;
         const bulkIssueExcelQueueProcessor = new Queue(queueName, redisConfig);
         // Handle Redis connection error
         let redisConnectionFailed = false;
@@ -602,22 +615,34 @@ const handleBatchExcelFile = async (_path, issuer) => {
             message: "Redis connection failed. Please check and try again later.",
           };
         }
-        bulkIssueExcelQueueProcessor.process(concurrency, processListener);
+        // bulkIssueExcelQueueProcessor.process(concurrency, processListener);
+        bulkIssueExcelQueueProcessor.process(concurrency, async (job) => await processListener(job));
+
         // Add jobs in chunks, passing batchId as part of job data
         const jobs = await addJobsInChunks(
           bulkIssueExcelQueueProcessor,
           rawBatchData,
           chunkSize,
-          (chunk) => ({ chunk, rows, issuerId }) // Include batchId in job data
+          issuerId,
+          (chunk,issuerId) => ({ chunk, rows, issuerId }) // Include batchId in job data
         );
+
+        // Assuming `jobs` is an array of job objects
+        jobs.forEach((job, index) => {
+          console.log(`Issuer ID for Job ${index + 1}:`, job.data.issuerId);
+          jobId = job.data.issuerId;
+        });
+        console.log("The process job id", jobId);
         try {
           await waitForJobsToComplete(jobs).catch(async (err) => {
             await cleanUpJobs(bulkIssueExcelQueueProcessor);
+            // await _cleanUpJobs(bulkIssueExcelQueueProcessor, jobId);
             throw err;
           });
           await cleanUpJobs(bulkIssueExcelQueueProcessor);
+          // await _cleanUpJobs(bulkIssueExcelQueueProcessor, jobId);
         } catch (error) {
-          await wipeUploadFolder();
+          await wipeSourceFolder(folderName);
           return {
             status: 400,
             response: false,
@@ -626,7 +651,7 @@ const handleBatchExcelFile = async (_path, issuer) => {
           };
         } finally {
           try {
-            // await wipeUploadFolder();
+            // await wipeSourceFolder(folderName);
             // Remove the process listener after processing jobs
             bulkIssueExcelQueueProcessor.removeAllListeners();
 
@@ -640,8 +665,6 @@ const handleBatchExcelFile = async (_path, issuer) => {
 
           } catch (error) {
             console.log("error while wiping upload folder in handleExcel", error.message);
-
-
           }
         }
         console.log("all jobs for excel data completed...");

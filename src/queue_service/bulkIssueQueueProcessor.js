@@ -3,19 +3,13 @@ const { StandardMerkleTree } = require("@openzeppelin/merkle-tree");
 const messageCode = require("../common/codes");
 const {
   isDBConnected,
-  insertUrlData,
   addDynamicLinkToPdf,
-  insertBulkBatchIssueData,
-  deletePngFiles,
   holdExecution,
-  insertDynamicBatchCertificateData,
 } = require("../model/tasks");
 const QRCode = require("qrcode");
 const crypto = require("crypto"); // Module for cryptographic functions
-const { generateEncryptedUrl } = require("../common/cryptoFunction");
 const fs = require("fs");
 const path = require("path");
-const { fromBuffer, fromBase64 } = require("pdf2pic");
 const AWS = require("../config/aws-config");
 const {
   generateVibrantQr,
@@ -84,9 +78,9 @@ s3UploadQueue.process(10, async (job) => {
   }
 });
 
-async function processBulkIssueJob(job,globalData) {
-  const { pdfResponse } = job.data;
-  const {
+async function processBulkIssueJob(job) {
+    const {
+    pdfResponse,
     pdfWidth,
     pdfHeight,
     linkUrl,
@@ -102,8 +96,11 @@ async function processBulkIssueJob(job,globalData) {
     txHash,
     bulkIssueStatus,
     flag,
+    customFolder,
     qrOption,
-  } = globalData;
+    queueId
+  } = job.data;
+
 
   const certificateDataArray = []; // Array to collect all certificate data
   const insertUrl = []; // For URLS to return
@@ -127,6 +124,7 @@ async function processBulkIssueJob(job,globalData) {
         txHash,
         bulkIssueStatus,
         flag,
+        customFolder,
         qrOption,
         certificateDataArray,
       });
@@ -149,6 +147,7 @@ async function processBulkIssueJob(job,globalData) {
       status: true,
       message: "Batch issued successfully",
       URLS: insertUrl,
+      queueId
     };
   } catch (error) {
     console.error("Error processing bulk issue job:", error);
@@ -180,6 +179,7 @@ async function processSinglePdf({
   bulkIssueStatus,
   flag,
   insertPromises,
+  customFolder,
   qrOption,
   certificateDataArray,
 }) {
@@ -188,7 +188,7 @@ async function processSinglePdf({
     let imageUrl = "";
     const treeData = JSON.parse(serializedTree);
     const tree = StandardMerkleTree.load(treeData);
-    const pdfFilePath = path.join(__dirname, "../../uploads", pdfFileName);
+    const pdfFilePath = path.join(__dirname, "../../uploads", customFolder, pdfFileName);
     console.log("pdf directory path", pdfFilePath);
     // Extract Certs from pdfFileName
     const certs = pdfFileName.split(".")[0]; // Remove file extension
@@ -225,23 +225,7 @@ async function processSinglePdf({
 
     var combinedHash = hashedBatchData[index];
 
-    // const encryptLink = await generateEncryptedUrl(fields);
-
-    // if (encryptLink) {
-    //   let dbStatus = await isDBConnected();
-    //   if (dbStatus) {
-    //     let urlData = {
-    //       email: email,
-    //       certificateNumber: foundEntry.documentID,
-    //       url: encryptLink,
-    //     };
-    //     await insertUrlData(urlData);
-    //     shortUrlStatus = true;
-    //   }
-    // }
-    // if (shortUrlStatus) {
       modifiedUrl = process.env.SHORT_URL + foundEntry.documentID;
-    // }
 
     let _qrCodeData = modifiedUrl 
     // Generate vibrant QR
@@ -257,6 +241,7 @@ async function processSinglePdf({
 
     const qrImageData = generateQr ? generateQr : qrCodeImage;
     var file = pdfFilePath;
+    pdfFileName = `${foundEntry.documentID}.pdf`;
     var outputPdf = `${pdfFileName}`;
 
     // Add link and QR code to the PDF file
@@ -284,6 +269,7 @@ async function processSinglePdf({
     var outputPath = path.join(
       __dirname,
       "../../uploads",
+      customFolder,
       "completed",
       `${pdfFileName}`
     );
@@ -494,23 +480,23 @@ const insertDynamicBatchCertificateDataBulk = async (dataArray) => {
   try {
     // Map the input data array to the structure required by the DynamicBatchIssues model
     const bulkInsertData = dataArray.map(data => ({
-      issuerId: data.issuerId,
-      batchId: data.batchId,
-      proofHash: data.proofHash,
-      encodedProof: data.encodedProof,
-      transactionHash: data.transactionHash,
-      certificateHash: data.certificateHash,
-      certificateNumber: data.certificateNumber,
-      name: data.name,
-      certificateFields: data.customFields,
+      issuerId: data?.issuerId,
+      batchId: data?.batchId,
+      proofHash: data?.proofHash,
+      encodedProof: data?.encodedProof,
+      transactionHash: data?.transactionHash,
+      certificateHash: data?.certificateHash,
+      certificateNumber: data?.certificateNumber,
+      name: data?.name,
+      certificateFields: data?.customFields || [],
       certificateStatus: 1, // Set default status if necessary
-      positionX: data.positionX,
-      positionY: data.positionY,
-      qrSize: data.qrSize,
-      width: data.width,
-      height: data.height,
-      qrOption: data.qrOption || 0,
-      url: data.url || '',
+      positionX: data?.positionX || 0,
+      positionY: data?.positionY || 0,
+      qrSize: data?.qrSize || 0,
+      width: data?.width || 0,
+      height: data?.height || 0,
+      qrOption: data?.qrOption || 0,
+      url: data?.url || '',
       type: 'dynamic',
       issueDate: Date.now()
     }));
@@ -533,13 +519,13 @@ const insertDynamicBatchCertificateDataBulk = async (dataArray) => {
       lastUpdate: Date.now()
     }));
   
-
     // Perform bulk insert into IssueStatus
     await IssueStatus.insertMany(bulkStatusData, { ordered: false });
     console.log(`Inserted ${bulkStatusData.length} issue status records in bulk.`);
 
   } catch (error) {
     console.error("Error in bulk insert:", error);
+    console.error("Failed data:", dataArray);
   }
 };
 
