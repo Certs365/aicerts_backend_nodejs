@@ -15,9 +15,6 @@ const { generateEncryptedUrl } = require("../common/cryptoFunction");
 // Import MongoDB models
 const { User, Issues, DynamicIssues } = require("../config/schema");
 
-// Import ABI (Application Binary Interface) from the JSON file located at "../config/abi.json"
-const abi = require("../config/abi.json");
-
 const bulkIssueStatus = process.env.BULK_ISSUE_STATUS || "DEFAULT";
 
 const withoutPdfWidth = parseInt(process.env.WITHOUT_PDF_WIDTH) || null;
@@ -71,32 +68,6 @@ const {
 // Retrieve contract address from environment variable
 const contractAddress = process.env.CONTRACT_ADDRESS;
 
-// Define an array of providers to use as fallbacks
-const providers = [
-  new ethers.AlchemyProvider(
-    process.env.RPC_NETWORK,
-    process.env.ALCHEMY_API_KEY
-  ),
-  new ethers.InfuraProvider(
-    process.env.RPC_NETWORK,
-    process.env.INFURA_API_KEY
-  ),
-  // new ethers.ChainstackProvider(process.env.RPC_NETWORK, process.env.CHAIN_KEY),
-  // new ethers.JsonRpcProvider(process.env.CHAIN_RPC)
-  // Add more providers as needed
-];
-
-// Create a new FallbackProvider instance
-const _fallbackProvider = new ethers.FallbackProvider(providers);
-
-// Create a new ethers signer instance using the private key from environment variable and the provider(Fallback)
-const signer = new ethers.Wallet(process.env.PRIVATE_KEY, _fallbackProvider);
-
-// Create a new ethers contract instance with a signing capability (using the contract Address, ABI and signer)
-const newContract = new ethers.Contract(contractAddress, abi, signer);
-
-// const newContract = await connectToPolygon();
-
 // Parse environment variables for password length constraints
 const min_length = parseInt(process.env.MIN_LENGTH);
 const max_length = parseInt(process.env.MAX_LENGTH);
@@ -112,7 +83,6 @@ const {
 const {
   processBulkIssueJob,
 } = require("../queue_service/bulkIssueQueueProcessor");
-const rootDirectory = path.join(__dirname, "../../");
 
 const handleIssueCertification = async (
   email,
@@ -135,8 +105,7 @@ const handleIssueCertification = async (
   let todayEpoch = today.getTime() / 1000; // Convert milliseconds to seconds
 
   const epochGrant = await convertDateToEpoch(grantDate);
-  const epochExpiration =
-    expirationDate != 1 ? await convertDateToEpoch(expirationDate) : 1;
+  const epochExpiration = expirationDate != 1 ? await convertDateToEpoch(expirationDate) : 1;
   const validExpiration = todayEpoch + 32 * 24 * 60 * 60; // Add 32 days (30 * 24 hours * 60 minutes * 60 seconds);
 
   if (
@@ -2017,8 +1986,6 @@ const dynamicBulkCertificates = async (
     // Format as arrays with corresponding elements using a loop
     values = hashedBatchData.map((hash) => [hash]);
 
-    // await cleanUploadFolder();
-    // return ({ code: 400, status: false, message: messageCode.msgUnderConstruction, Details: `${values}` });
     try {
       // Generate the Merkle tree
       let tree = StandardMerkleTree.of(values, ["string"]);
@@ -2260,7 +2227,6 @@ const dynamicBulkCertificates = async (
           Details: insertUrl,
         };
       } else {
-        // await wipeUploadFolder();
         await wipeSourceFolder(customFolder);
         return {
           code: 400,
@@ -2270,7 +2236,6 @@ const dynamicBulkCertificates = async (
         };
       }
     } catch (error) {
-      // await wipeUploadFolder();
       await wipeSourceFolder(customFolder);
       return {
         code: 400,
@@ -2280,7 +2245,6 @@ const dynamicBulkCertificates = async (
       };
     }
   } catch (error) {
-    // await wipeUploadFolder();
     await wipeSourceFolder(customFolder);
     return {
       code: 500,
@@ -2400,9 +2364,7 @@ const dynamicBatchCertificates = async (
     // Format as arrays with corresponding elements using a loop
     values = hashedBatchData.map((hash) => [hash]);
 
-    // await cleanUploadFolder();
-    // return ({ code: 400, status: false, message: messageCode.msgUnderConstruction, Details: `${values}` });
-    try {
+   try {
       // Generate the Merkle tree
       let tree = StandardMerkleTree.of(values, ["string"]);
       const serializedTree = JSON.stringify(tree.dump());
@@ -2566,7 +2528,6 @@ const dynamicBatchCertificates = async (
           Details: insertUrl,
         };
       } else {
-        // await wipeUploadFolder();
         await wipeSourceFolder(customFolder);
         return {
           code: 400,
@@ -2576,7 +2537,6 @@ const dynamicBatchCertificates = async (
         };
       }
     } catch (error) {
-      // await wipeUploadFolder();
       await wipeSourceFolder(customFolder);
       return {
         code: 400,
@@ -2593,7 +2553,6 @@ const dynamicBatchCertificates = async (
       });
     }
   } catch (error) {
-    // await wipeUploadFolder();
     await wipeSourceFolder(customFolder);
     return {
       code: 500,

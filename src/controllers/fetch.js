@@ -19,7 +19,8 @@ const {
   isValidIssuer,
   holdExecution,
   validateSearchDateFormat,
-  isDBConnected // Function to check if the database connection is established
+  isDBConnected, // Function to check if the database connection is established
+  wipeSourceFile
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
 
 // Define the API endpoint and parameters
@@ -979,18 +980,10 @@ const uploadFileToS3 = async (req, res) => {
     const data = await s3.upload(uploadParams).promise();
     console.log('File uploaded successfully to', data.Location);
     res.status(200).send({ code: 200, status: "SUCCESS", message: 'File uploaded successfully', fileUrl: data.Location });
-    // await cleanUploadFolder();
-    // Clean up the upload file
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    await wipeSourceFile(req.file.path);
   } catch (error) {
     console.error('Error uploading file:', error);
-    // await cleanUploadFolder();
-    // Clean up the upload file
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    await wipeSourceFile(req.file.path);
     res.status(500).send({ code: 500, status: "FAILED", error: 'An error occurred while uploading the file', details: error });
     return;
   }
@@ -1763,18 +1756,10 @@ const uploadCertificateToS3 = async (req, res) => {
         break;
       default:
         console.error('Invalid type:', type);
-        // await cleanUploadFolder();
-        // Clean up the upload file
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
-        }
+        await wipeSourceFile(req.file.path);
         return res.status(400).send({ code: 400, status: "FAILED", message: 'Invalid type' });
     }
-    // await cleanUploadFolder();
-    // Clean up the upload file
-    if (fs.existsSync(file)) {
-      fs.unlinkSync(file);
-    }
+    await wipeSourceFile(req.file.path);
     res.status(200).send({ code: 200, status: "SUCCESS", message: 'File uploaded successfully', fileUrl: data.Location });
     return;
   } catch (error) {

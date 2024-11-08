@@ -6,8 +6,6 @@ const path = require("path");
 // Importing functions from a custom module
 const {
   isCertificationIdExisted,
-  isBulkCertificationIdExisted,
-  wipeUploadFolder,
   wipeSourceFolder,
   generateCustomFolder,
 } = require("../model/tasks"); // Importing functions from the '../model/tasks' module
@@ -643,7 +641,6 @@ const handleBatchExcelFile = async (_path, issuer) => {
           await cleanUpJobs(bulkIssueExcelQueueProcessor);
           // await _cleanUpJobs(bulkIssueExcelQueueProcessor, jobId);
         } catch (error) {
-          // await wipeUploadFolder();
           await wipeSourceFolder(folderName);
           return {
             status: 400,

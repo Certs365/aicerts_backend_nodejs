@@ -12,12 +12,6 @@ const { decryptData, generateEncryptedUrl } = require("../common/cryptoFunction"
 const pdf = require("pdf-lib"); // Library for creating and modifying PDF documents
 const { PDFDocument } = pdf;
 
-// Import MongoDB models
-const { ShortUrl, DynamicIssues, DynamicBatchIssues } = require("../config/schema");
-
-// Import ABI (Application Binary Interface) from the JSON file located at "../config/abi.json"
-const abi = require("../config/abi.json");
-
 // Importing functions from a custom module
 const {
   connectToPolygon,
@@ -27,32 +21,12 @@ const {
   extractCertificateInformation,
   verificationLogEntry,
   isCertificationIdExisted,
-  isBulkCertificationIdExisted,
   isDynamicCertificationIdExisted,
   holdExecution,
   checkTransactionStatus,
   renameUploadPdfFile,
   wipeSourceFile
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
-
-// Retrieve contract address from environment variable
-const contractAddress = process.env.CONTRACT_ADDRESS;
-
-// Define an array of providers to use as fallbacks
-const providers = [
-  new ethers.AlchemyProvider(process.env.RPC_NETWORK, process.env.ALCHEMY_API_KEY),
-  new ethers.InfuraProvider(process.env.RPC_NETWORK, process.env.INFURA_API_KEY)
-  // Add more providers as needed
-];
-
-// Create a new FallbackProvider instance
-const fallbackProvider = new ethers.FallbackProvider(providers);
-
-// Create a new ethers signer instance using the private key from environment variable and the provider(Fallback)
-const signer = new ethers.Wallet(process.env.PRIVATE_KEY, fallbackProvider);
-
-// Create a new ethers contract instance with a signing capability (using the contract Address, ABI and signer)
-const newContract = new ethers.Contract(contractAddress, abi, signer);
 
 var messageCode = require("../common/codes");
 const e = require('express');
@@ -116,9 +90,6 @@ const verify = async (req, res) => {
         try {
           await isDBConnected();
           var isIdExist = await isCertificationIdExisted(certificationNumber);
-          // if (!isIdExist) {
-          //   isIdExist = await isBulkCertificationIdExisted(certificationNumber);
-          // }
           if (isIdExist) {
             var blockchainResponse = 0;
             if (isIdExist.batchId == undefined) {
@@ -238,7 +209,7 @@ const verify = async (req, res) => {
           if (dbStatus) {
             var getCertificationInfo = await isCertificationIdExisted(extractQRData['Certificate Number']);
             if (!getCertificationInfo) {
-              getCertificationInfo = await isBulkCertificationIdExisted(extractQRData['Certificate Number']);
+              getCertificationInfo = await isDynamicCertificationIdExisted(extractQRData['Certificate Number']);
             }
             if (extractQRData && !getCertificationInfo) {
               let transactionHash = extractQRData["Polygon URL"].split('/').pop();
@@ -364,9 +335,6 @@ const decodeQRScan = async (req, res) => {
         try {
           await isDBConnected();
           var isIdExist = await isCertificationIdExisted(certificationNumber);
-          // if (!isIdExist) {
-          //   isIdExist = await isBulkCertificationIdExisted(certificationNumber);
-          // }
           if (isIdExist) {
             var blockchainResponse = 0;
             if (isIdExist.batchId == undefined) {
@@ -452,7 +420,7 @@ const decodeQRScan = async (req, res) => {
           if (dbStatus) {
             var getCertificationInfo = await isCertificationIdExisted(extractQRData['Certificate Number']);
             if (!getCertificationInfo) {
-              getCertificationInfo = await isBulkCertificationIdExisted(extractQRData['Certificate Number']);
+              getCertificationInfo = await isDynamicCertificationIdExisted(extractQRData['Certificate Number']);
             }
             certificateS3Url = null;
             if (getCertificationInfo) {
@@ -547,7 +515,7 @@ const decodeCertificate = async (req, res) => {
 
       var getCertificationInfo = await isCertificationIdExisted(parsedData['Certificate Number']);
       if (!getCertificationInfo) {
-        getCertificationInfo = await isBulkCertificationIdExisted(parsedData['Certificate Number']);
+        getCertificationInfo = await isDynamicCertificationIdExisted(parsedData['Certificate Number']);
       }
 
       var verifyLog = {
@@ -560,7 +528,7 @@ const decodeCertificate = async (req, res) => {
       if (dbStatus) {
         var getValidCertificatioInfo = await isCertificationIdExisted(originalData.Certificate_Number);
         if (!getValidCertificatioInfo) {
-          getValidCertificatioInfo = await isBulkCertificationIdExisted(originalData.Certificate_Number);
+          getValidCertificatioInfo = await isDynamicCertificationIdExisted(originalData.Certificate_Number);
         }
         if (getValidCertificatioInfo) {
           certificateS3Url = getValidCertificatioInfo.url != null ? getValidCertificatioInfo.url : null;
@@ -623,9 +591,6 @@ const verifyCertificationId = async (req, res) => {
     try {
       await isDBConnected();
       var isIdExist = await isCertificationIdExisted(inputId);
-      // if (!isIdExist) {
-      //   isIdExist = await isBulkCertificationIdExisted(inputId);
-      // }
       if (isIdExist) {
         var blockchainResponse = 0;
         if (isIdExist.batchId == undefined) {
@@ -663,8 +628,6 @@ const verifyCertificationId = async (req, res) => {
 
           let inputFileExist = await hasFilesInDirectory(uploadsPath);
           if (inputFileExist) {
-            // Clean up the upload folder
-            // await cleanUploadFolder();
           }
 
           let txStatus = await checkTransactionStatus(isIdExist.transactionHash);
@@ -702,8 +665,6 @@ const verifyCertificationId = async (req, res) => {
         await verificationLogEntry(verifyLog);
         let inputFileExist = await hasFilesInDirectory(uploadsPath);
         if (inputFileExist) {
-          // Clean up the upload folder
-          // await cleanUploadFolder();
         }
 
         let txStatus = await checkTransactionStatus(isIdExist.transactionHash);
@@ -725,8 +686,6 @@ const verifyCertificationId = async (req, res) => {
         }
         let inputFileExist = await hasFilesInDirectory(uploadsPath);
         if (inputFileExist) {
-          // Clean up the upload folder
-          // await cleanUploadFolder();
         }
 
         if(isDynamicCertificateExist.certificateStatus == 3){
