@@ -53,6 +53,7 @@ const UserSchema = new Schema({
   rejectedDate: { type: Date, default: null },
   invoiceNumber: { type: Number, default: 0 },
   batchSequence: { type: Number, default: 0 },
+  blockchainSequence: { type: Number, default: 0 },
   transactionFee: { type: Number, default: 0 },
   qrPreference: { type: Number, default: 0 },
   blockchainPreference: { type: Number, default: 0 },

@@ -1929,6 +1929,7 @@ const dynamicBulkCertificates = async (
   if (!newContract) {
     return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
   }
+  const idExist = await findOne({ email: email});
   // console.log("Batch inputs", _pdfReponse, excelFilePath);
   const pdfResponse = _pdfReponse;
   const excelResponse = _excelResponse[0];
@@ -2000,7 +2001,11 @@ const dynamicBulkCertificates = async (
       }
 
       var batchNumber = await newContract.getRootLength();
-      var allocateBatchId = parseInt(batchNumber) + 1;
+      idExist.blockchainSequence = batchNumber ? parseInt(batchNumber) + 1 : 1;
+
+      const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1 ;
+      idExist.batchSequence = allocateBatchId;
+
 
       var { txHash, txFee } = await issueBatchCertificateWithRetry(
         tree.root,
@@ -2306,6 +2311,7 @@ const dynamicBatchCertificates = async (
   if (!newContract) {
     return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
   }
+  const idExist = await findOne({ email: email });
   // console.log("Batch inputs", _pdfReponse, excelFilePath);
   const pdfResponse = _pdfReponse;
   const excelResponse = _excelResponse[0];
@@ -2379,7 +2385,10 @@ const dynamicBatchCertificates = async (
       }
 
       var batchNumber = await newContract.getRootLength();
-      var allocateBatchId = parseInt(batchNumber) + 1;
+      idExist.blockchainSequence = batchNumber ? parseInt(batchNumber) + 1 : 1;
+
+      const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1 ;
+      idExist.batchSequence = allocateBatchId;
 
       var { txHash, txFee } = await issueBatchCertificateWithRetry(
         tree.root,

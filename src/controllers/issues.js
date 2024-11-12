@@ -779,8 +779,11 @@ const batchIssueCertificate = async (req, res) => {
           const tree = StandardMerkleTree.of(values, ['string']);
           let dateEntry;
 
-          const batchNumber = await newContract.getRootLength();
-          const allocateBatchId = parseInt(batchNumber) + 1;
+          var batchNumber = await newContract.getRootLength();
+          idExist.blockchainSequence = batchNumber ? parseInt(batchNumber) + 1 : 1;
+
+          const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1 ;
+          idExist.batchSequence = allocateBatchId;
           // const allocateBatchId = 1;
           if (allDatesCommon) {
             dateEntry = firstItemEpoch;
