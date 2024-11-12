@@ -694,4 +694,114 @@ router.post('/convert-excel', upload.single("file"), adminController.convertInto
  */
 router.post('/generate-excel-report', adminController.generateExcelReport);
 
+/**
+ * @swagger
+ * /api/generate-badge:
+ *   post:
+ *     summary: Get excel file report
+ *     description: API to fetch details from DB and generate excel file as response.
+ *     tags: [Blockchain]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 description: Provide email 
+ *               certificateNumber:
+ *                 type: string
+ *                 description: Provide the certification number  
+ *               name:
+ *                 type: string
+ *                 description: Provide the certification holder name  
+ *               course:
+ *                 type: string
+ *                 description: Provide the certification course
+ *               hash:
+ *                 type: string
+ *                 description: Provide the certification transaction hash
+ *               grantDate:
+ *                 type: string
+ *                 description: Provide the certificate grant date
+ *               expirationDate:
+ *                 type: string
+ *                 description: Provide the certificate expiration date
+ *             required:
+ *               - email
+ *               - certificateNumber
+ *               - name
+ *               - course
+ *               - hash
+ *     responses:
+ *       '200':
+ *         description: Issue allocated with Batch successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: SUCCESS
+ *                 message:
+ *                   type: string
+ *                   example: Badge issued successfully
+ *                 details:
+ *                   type: array
+ *                   items:
+ *                     [Issuers Log Details]
+ *       '400':
+ *         description: Bad request or Invalid code
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: FAILED
+ *                 message:
+ *                   type: string
+ *                   example: Issues details not found (or) Bad request!
+ *             example:
+ *               code: 400.
+ *               status: "FAILED"
+ *               message: Error message for Badge issue.
+ *       '422':
+ *         description: User given invalid input (Unprocessable Entity)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *             example:
+ *               code: 422.
+ *               status: "FAILED"
+ *               message: Error message for invalid input.
+ *       '500':
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: FAILED
+ *                 message:
+ *                   code: 500.
+ *                   type: string
+ *                   example: An error occurred while issue Badge
+ */
+router.post('/generate-badge', adminController.generateBadgeOnIssue);
+
 module.exports=router;

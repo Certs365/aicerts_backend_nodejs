@@ -425,10 +425,67 @@ const generateExcelReport = async (req, res) => {
             }
         }
     } catch (error) {
-        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
+        res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
         return;
     }
 
+};
+
+/**
+ * API call for Badge allocation while Issue.
+ *
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
+const generateBadgeOnIssue = async (req, res) => {
+    const email = req.body.email;
+    const certId = req.body.certificateNumber;
+    const name = req.body.name;
+    const course = req.body.course;
+    const txHash = req.body.hash;
+    const grantDate = req?.body.grantDate;
+    const expirationDate = req?.body.expirationDate;
+    var issueDate = Date.now();
+    const issuedDate = new Date(issueDate).toLocaleString();
+
+    if(!email || !certId || !name || !course || !txHash){
+        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidInput });
+        return;
+    }
+
+    const isEmailExist = await User.findOne({ email : email });
+
+    if(!isEmailExist){
+        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgIssueNotFound, details: email });
+        return;
+    }
+
+    const badgeUrl = "https://certs365-live.s3.amazonaws.com/uploads/certs_badge_1.png";
+    const linkUrl = `https://${process.env.NETWORK}/tx/${txHash}`;
+    const verificationUrl = process.env.SHORT_URL + certId;
+
+    try {
+        const badgeDetails = {
+            email: email,
+            certificateNumber: certId,
+            name: name,
+            course: course,
+            hash: txHash,
+            issuedDate: issuedDate,
+            badge: badgeUrl,
+            blockchainUrl: linkUrl,
+            verificationUrl: verificationUrl
+        };
+
+        // const issueBadge = JSON.stringify(badgeDetails);
+        res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgBadgeIssued, details: badgeDetails });
+        return;
+
+    } catch (error) {
+        console.error("An error occured ", error);
+        res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
+        return;
+    }
 };
 
 module.exports = {
@@ -449,5 +506,8 @@ module.exports = {
 
     // Function to fetch DB file and generate reports into excel file format
     generateExcelReport,
+
+    // Function to allocate badge to an issue
+    generateBadgeOnIssue
 
 };

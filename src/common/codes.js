@@ -227,4 +227,7 @@ module.exports = {
     msgMaximumRange: "Maximum credits allocation must not exceed 100",
     msgExistedMaximum: "Issuer has over maximum credits limit already",
 
+    // Badges
+    msgBadgeIssued: "Badge issued successfully",
+
 };
