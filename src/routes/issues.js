@@ -921,7 +921,6 @@ router.post('/batch-certificate-issue', __upload.single("excelFile"), ensureAuth
  */
 
 router.post('/dynamic-batch-issue', upload.single("zipFile"), ensureAuthenticated, adminController.dynamicBatchIssueConcurrency);
-// router.post('/dynamic-batch-issue', upload.single("zipFile"), adminController.dynamicBatchIssueCertificates);
 
 /**
  * @swagger

@@ -69,16 +69,14 @@ const {
 const contractAddress = process.env.CONTRACT_ADDRESS;
 
 // Parse environment variables for password length constraints
-const min_length = parseInt(process.env.MIN_LENGTH);
-const max_length = parseInt(process.env.MAX_LENGTH);
+const min_length = 6;
+const max_length = 50;
 
 const messageCode = require("../common/codes");
 const {
   waitForJobsToComplete,
   cleanUpJobs,
   addJobsInChunks,
-  getGlobalDataforQueue,
-  setGlobalDataforQueue,
 } = require("../queue_service/queueUtils");
 const {
   processBulkIssueJob,
