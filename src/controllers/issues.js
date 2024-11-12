@@ -784,6 +784,8 @@ const batchIssueCertificate = async (req, res) => {
 
           const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1 ;
           idExist.batchSequence = allocateBatchId;
+
+          await idExist.save();
           // const allocateBatchId = 1;
           if (allDatesCommon) {
             dateEntry = firstItemEpoch;

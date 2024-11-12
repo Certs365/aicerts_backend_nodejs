@@ -2005,7 +2005,7 @@ const dynamicBulkCertificates = async (
 
       const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1 ;
       idExist.batchSequence = allocateBatchId;
-
+      await idExist.save();
 
       var { txHash, txFee } = await issueBatchCertificateWithRetry(
         tree.root,
@@ -2383,6 +2383,7 @@ const dynamicBatchCertificates = async (
 
       const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1 ;
       idExist.batchSequence = allocateBatchId;
+      await idExist.save();
 
       var { txHash, txFee } = await issueBatchCertificateWithRetry(
         tree.root,
