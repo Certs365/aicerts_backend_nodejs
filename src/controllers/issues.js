@@ -1589,7 +1589,6 @@ const dynamicBatchIssueCredentials = async (req, res) => {
       await wipeSourceFolder(customFolderName);
       return;
     }
-
     flag = 0;
     bulkIssueResponse = await dynamicBatchCertificates(emailExist.email, emailExist.issuerId, pdfFiles, excelData.message, excelFilePath, paramsExist.positionX, paramsExist.positionY, paramsExist.qrSide, paramsExist.pdfWidth, paramsExist.pdfHeight, qrOption, customFolderName, flag);
     await wipeSourceFile(req.file.path);

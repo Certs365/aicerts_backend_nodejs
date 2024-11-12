@@ -1929,7 +1929,7 @@ const dynamicBulkCertificates = async (
   if (!newContract) {
     return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
   }
-  const idExist = await findOne({ email: email});
+  const idExist = await User.findOne({ email: email});
   // console.log("Batch inputs", _pdfReponse, excelFilePath);
   const pdfResponse = _pdfReponse;
   const excelResponse = _excelResponse[0];
@@ -2311,16 +2311,10 @@ const dynamicBatchCertificates = async (
   if (!newContract) {
     return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
   }
-  const idExist = await findOne({ email: email });
+  const idExist = await User.findOne({ email: email });
   // console.log("Batch inputs", _pdfReponse, excelFilePath);
   const pdfResponse = _pdfReponse;
   const excelResponse = _excelResponse[0];
-  // var insertPromises = []; // Array to hold all insert promises
-  // var insertUrl = [];
-  // var shortUrlStatus = false;
-  // var modifiedUrl;
-  // var imageUrl;
-  // var customFields;
 
   if (!pdfResponse || pdfResponse.length == 0) {
     return {
@@ -2329,7 +2323,6 @@ const dynamicBatchCertificates = async (
       message: messageCode.msgUnableToFindPdfFiles,
     };
   }
-
   try {
     // Check if the directory exists, if not, create it
     const destDirectory = path.join(__dirname, "../../uploads/", customFolder, "completed");
@@ -2376,6 +2369,7 @@ const dynamicBatchCertificates = async (
 
       let getContractStatus = await getContractAddress(contractAddress);
       if (!getContractStatus) {
+        await wipeSourceFolder(customFolder);
         return {
           code: 400,
           status: "FAILED",
@@ -2395,6 +2389,7 @@ const dynamicBatchCertificates = async (
         batchExpiration
       );
       if (!txHash) {
+        await wipeSourceFolder(customFolder);
         return {
           code: 400,
           status: false,
@@ -2428,27 +2423,6 @@ const dynamicBatchCertificates = async (
         const queueName = `bulkIssueQueue${queueId}`;
 
         const bulkIssueQueue = new Queue(queueName, redisConfig);
-
-        // setGlobalDataforQueue({
-        //   pdfWidth,
-        //   pdfHeight,
-        //   linkUrl,
-        //   qrside,
-        //   posx,
-        //   posy,
-        //   excelResponse,
-        //   hashedBatchData,
-        //   serializedTree,
-        //   email,
-        //   issuerId,
-        //   allocateBatchId,
-        //   txHash,
-        //   bulkIssueStatus,
-        //   customFolder,
-        //   flag,
-        //   qrOption,
-        // })
-
 
         const jobDataCallback = (chunk,queueId) => ({
           pdfResponse: chunk,
@@ -2503,26 +2477,6 @@ const dynamicBatchCertificates = async (
               message: "",
               Details: [],
             });
-            // console.log("finally done")
-            // setGlobalDataforQueue({
-            //   pdfWidth: null,
-            //   pdfHeight: null,
-            //   linkUrl: null,
-            //   qrside: null,
-            //   posx: null,
-            //   posy: null,
-            //   excelResponse: null,
-            //   hashedBatchData: null,
-            //   serializedTree: null,
-            //   email: null,
-            //   issuerId: null,
-            //   allocateBatchId: null,
-            //   txHash: null,
-            //   bulkIssueStatus: null,
-            //   customFolder: null,
-            //   flag: null,
-            //   qrOption: null,
-            // })
 
           } catch (error) {
             console.log("erro while deleting upload folder..", error.message)
