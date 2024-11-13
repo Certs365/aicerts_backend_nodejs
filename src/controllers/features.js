@@ -261,9 +261,7 @@ const updateBatchStatus = async (req, res) => {
             }
         }
 
-        const blockchainSequenceId = issuerExist.blockchainSequence;
-
-        const batchStatusResponse = await handleUpdateBatchCertificationStatus(email, batchId, batchStatus, blockchainSequenceId);
+        const batchStatusResponse = await handleUpdateBatchCertificationStatus(email, batchId, batchStatus);
         if (!batchStatusResponse) {
             return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError });
         }

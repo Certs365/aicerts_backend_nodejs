@@ -301,14 +301,14 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
                 //blockchain calls
                 let fetchIndex = isNumberExistInBatch.batchId - 1;
                 // let verifyBatchId = await newContract.verifyBatchRoot(fetchIndex);
-                let _fetchRootLength = await newContract.getRootLength();
-                let fetchRootLength = parseInt(_fetchRootLength);
+                // let _fetchRootLength = await newContract.getRootLength();
+                // let fetchRootLength = parseInt(_fetchRootLength);
                 let hashedProof = isNumberExistInBatch.encodedProof;
                 let certificateStatus = await newContract.getBatchCertificateStatus(hashedProof);
-                if (fetchRootLength < fetchIndex) {
-                    // Respond with error message
-                    return ({ code: 400, status: "FAILED", message: messageCode.msgInvalidRootPassed });
-                } else {
+                // if (fetchRootLength < fetchIndex) {
+                //     // Respond with error message
+                //     return ({ code: 400, status: "FAILED", message: messageCode.msgInvalidRootPassed });
+                // } else {
                     const batchStatus = isNumberExistInBatch.certificateStatus;
                     if (batchStatus == 3 || (parseInt(certificateStatus) == 3)) {
                         // Respond with error message
@@ -410,21 +410,7 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
                                     qrCodeData = urlLink;
                                 }
 
-                                // if (urlLink) {
-                                //     let dbStatus = await isDBConnected();
-                                //     if (dbStatus) {
-                                //         let urlExist = await ShortUrl.findOne({ certificateNumber: certificateNumber });
-                                //         if (urlExist) {
-                                //             urlExist.url = urlLink;
-                                //             await urlExist.save();
-                                //             shortUrlStatus = true;
-                                //         }
-                                //     }
-                                // }
-
-                                // if (shortUrlStatus) {
                                 modifiedUrl = process.env.SHORT_URL + certificateNumber;
-                                // }
 
                                 const _qrCodeData = modifiedUrl != false ? modifiedUrl : qrCodeData;
 
@@ -512,7 +498,7 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
                         console.error(error);
                         return ({ code: 400, status: "FAILED", message: messageCode.msgFailedAtBlockchain, details: error });
                     }
-                }
+                // }
             } catch (error) {
                 // Internal server error
                 console.error(error);
@@ -912,11 +898,11 @@ const handleRenewBatchOfCertifications = async (email, batchId, batchExpirationD
 
             var _rootIndex = parseInt(rootIndex);
             const verifyBatchResponse = await newContract.verifyBatchRoot(_rootIndex);
-            const _getIndex = await newContract.getRootLength();
-            var getIndex = parseInt(_getIndex);
-            if (batchId > getIndex || batchId <= 0) {
-                return ({ code: 400, status: "FAILED", message: messageCode.msgInvalidBatch });
-            }
+            // const _getIndex = await newContract.getRootLength();
+            // var getIndex = parseInt(_getIndex);
+            // if (batchId > getIndex || batchId <= 0) {
+            //     return ({ code: 400, status: "FAILED", message: messageCode.msgInvalidBatch });
+            // }
             var batchResponse = parseInt(verifyBatchResponse[1]);
             if (batchResponse == 1) {
                 return ({ code: 400, status: "FAILED", message: messageCode.msgUpdateBatchExpirationNotPossible });
@@ -970,7 +956,7 @@ const handleRenewBatchOfCertifications = async (email, batchId, batchExpirationD
     }
 };
 
-const handleUpdateBatchCertificationStatus = async (email, batchId, certStatus, blockchainId) => {
+const handleUpdateBatchCertificationStatus = async (email, batchId, certStatus) => {
     const newContract = await connectToPolygon();
     if (!newContract) {
         return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
@@ -986,7 +972,7 @@ const handleUpdateBatchCertificationStatus = async (email, batchId, certStatus, 
         console.log(dbStatusMessage);
 
         const isIssuerExist = await isValidIssuer(email);
-        const rootIndex = blockchainId - 1;
+        const rootIndex = batchId - 1;
 
         if (!isIssuerExist) {
             return ({ code: 400, status: "FAILED", message: messageCode.msgInvalidIssuer });
@@ -1012,10 +998,10 @@ const handleUpdateBatchCertificationStatus = async (email, batchId, certStatus, 
 
             var _rootIndex = parseInt(rootIndex);
             const verifyBatchResponse = await newContract.verifyBatchRoot(_rootIndex);
-            const getIndex = await newContract.getRootLength();
-            if (getIndex <= _rootIndex) {
-                return ({ code: 400, status: "FAILED", message: messageCode.msgInvalidBatch });
-            }
+            // const getIndex = await newContract.getRootLength();
+            // if (getIndex <= _rootIndex) {
+            //     return ({ code: 400, status: "FAILED", message: messageCode.msgInvalidBatch });
+            // }
             var batchResponse = parseInt(verifyBatchResponse[1]);
             if (verifyBatchResponse[0] === true && batchResponse != 0) {
                 var batchExpirationEpoch = parseInt(verifyBatchResponse[1]);

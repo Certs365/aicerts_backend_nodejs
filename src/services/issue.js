@@ -2000,9 +2000,6 @@ const dynamicBulkCertificates = async (
         };
       }
 
-      var batchNumber = await newContract.getRootLength();
-      idExist.blockchainSequence = batchNumber ? parseInt(batchNumber) + 1 : 1;
-
       const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1 ;
       idExist.batchSequence = allocateBatchId;
       await idExist.save();
@@ -2377,9 +2374,6 @@ const dynamicBatchCertificates = async (
           details: messageCode.msgRpcFailed,
         };
       }
-
-      var batchNumber = await newContract.getRootLength();
-      idExist.blockchainSequence = batchNumber ? parseInt(batchNumber) + 1 : 1;
 
       const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1 ;
       idExist.batchSequence = allocateBatchId;

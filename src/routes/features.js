@@ -802,7 +802,6 @@ router.post('/generate-excel-report', adminController.generateExcelReport);
  */
 router.post('/upload-badge', adminController.uploadBadge);
 
-
 /**
  * @swagger
  * /api/get-badges:
