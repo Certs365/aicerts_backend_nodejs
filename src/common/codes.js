@@ -228,6 +228,12 @@ module.exports = {
     msgExistedMaximum: "Issuer has over maximum credits limit already",
 
     // Badges
+    msgMatchResultsFound: "Match results found.",
     msgBadgeIssued: "Badge issued successfully",
+    msgBadgeIssuedAlready: "Badge issue existed, Please check the Certificate number and try again...",
+    msgBadgeCodeExist: "Badge code existed, Please try again with different code...",
+    msgInvalidBadge: "Not found / Badge code Invalid, Please try again with valid code...",
+    msgBadgeDeleted: "Badge deleted successfully",
+    msgBadgeNotDeleted: "Unable to delete the badge, Please try again with valid details...",
 
 };

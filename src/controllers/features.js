@@ -31,7 +31,7 @@ const { convertToExcel } = require('../dist/convert');
 var messageCode = require("../common/codes");
 
 // Import the Issues models from the schema defined in "../config/schema"
-const { User } = require("../config/schema");
+const { User, BadgeDetails, BadgeIssues } = require("../config/schema");
 
 var existIssuerId;
 
@@ -432,6 +432,143 @@ const generateExcelReport = async (req, res) => {
 };
 
 /**
+ * API call for Upload Badge details.
+ *
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
+const uploadBadge = async (req, res) => {
+    const email = req.body.email;
+    const badgeCode = req.body.badgeCode;
+    const badgeTitle = req.body.badgeTitle;
+    const badgeImage = req.body.badgeImage;
+    const badgeDescription = req.body.badgeDescription;
+    const badgeCriteria = req.body.badgeCriteria; //  Array of strings
+
+    if (!email || !badgeCode || !badgeTitle || !badgeDescription || !badgeCriteria || !badgeImage) {
+        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidInput });
+        return;
+    }
+
+    const isEmailExist = await User.findOne({ email: email });
+
+    if (!isEmailExist) {
+        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgIssueNotFound, details: email });
+        return;
+    }
+
+    const isBadgeExist = await BadgeDetails.findOne({ badgeCode: badgeCode });
+    if (isBadgeExist) {
+        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgBadgeCodeExist, details: badgeCode });
+        return;
+    }
+
+    try {
+        const targetBadgeDetails = new BadgeDetails({
+            email: email,
+            badgeCode: badgeCode,
+            badgeTitle: badgeTitle,
+            badgeImage: badgeImage,
+            badgeDescription: badgeDescription,
+            badgeCriteria: badgeCriteria
+        });
+
+        await targetBadgeDetails.save();
+
+        res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgBadgeIssued, details: targetBadgeDetails });
+        return;
+
+    } catch (error) {
+        console.error("An error occured ", error);
+        res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
+        return;
+    }
+}
+
+/**
+ * API call for Get Badge details of an issuer.
+ *
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
+const getBadges = async (req, res) => {
+    const email = req.body.email;
+    const badgeCode = req.body?.badgeCode;
+    const flag = req.body?.flag;
+    var isBadgesExist;
+    try {
+        if (email) {
+            if (badgeCode && badgeCode != "string") {
+                isBadgesExist = await BadgeDetails.findOne({ email: email, badgeCode: badgeCode });
+            } else {
+                isBadgesExist = await BadgeDetails.find({ email: email });
+            }
+            
+            if (isBadgesExist) {
+                res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgMatchResultsFound, details: isBadgesExist });
+                return;
+            } else {
+                res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgNoMatchFound });
+                return;
+            }
+
+        } else {
+            res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidInput });
+            return;
+        }
+    } catch (error) {
+        console.error("An error occured ", error);
+        res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
+        return;
+    }
+}
+
+/**
+ * API call for Delete Badge details.
+ *
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
+const deleteBadge = async (req, res) => {
+    const email = req.body.email;
+    const badgeCode = req.body.badgeCode;
+
+    if (!email || !badgeCode) {
+        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidInput });
+        return;
+    }
+
+    const isBadgeExist = await BadgeDetails.findOne({
+        email: email,
+        badgeCode: badgeCode
+    });
+
+    if (!isBadgeExist) {
+        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidBadge, details: badgeCode });
+        return;
+    }
+
+    try {
+        const deleteBadge = await BadgeDetails.deleteOne({
+            email: email,
+            badgeCode: badgeCode
+        });
+
+        if (deleteBadge) {
+            res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgBadgeDeleted, details: badgeCode });
+            return;
+        } else {
+            res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgBadgeNotDeleted, details: badgeCode });
+            return;
+        }
+    } catch (error) {
+        console.error("An error occured ", error);
+        res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
+        return;
+    }
+}
+
+/**
  * API call for Badge allocation while Issue.
  *
  * @param {Object} req - Express request object.
@@ -439,6 +576,7 @@ const generateExcelReport = async (req, res) => {
  */
 const generateBadgeOnIssue = async (req, res) => {
     const email = req.body.email;
+    const badgeCode = req.body.badgeCode;
     const certId = req.body.certificateNumber;
     const name = req.body.name;
     const course = req.body.course;
@@ -448,19 +586,34 @@ const generateBadgeOnIssue = async (req, res) => {
     var issueDate = Date.now();
     const issuedDate = new Date(issueDate).toLocaleString();
 
-    if(!email || !certId || !name || !course || !txHash){
+    if (!email || !certId || !name || !course || !txHash) {
         res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidInput });
         return;
     }
 
-    const isEmailExist = await User.findOne({ email : email });
+    const isEmailExist = await User.findOne({ email: email });
 
-    if(!isEmailExist){
+    if (!isEmailExist) {
         res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgIssueNotFound, details: email });
         return;
     }
 
-    const badgeUrl = "https://certs365-live.s3.amazonaws.com/uploads/certs_badge_1.png";
+    const isBadgeExist = await BadgeDetails.findOne({
+        email: email,
+        badgeCode: badgeCode
+    });
+
+    if (!isBadgeExist) {
+        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidBadge, details: badgeCode });
+        return;
+    }
+
+    const isCertExist = await BadgeIssues.findOne({ certificateNumber: certId });
+    if (isCertExist) {
+        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgBadgeIssuedAlready, details: certId });
+        return;
+    }
+
     const linkUrl = `https://${process.env.NETWORK}/tx/${txHash}`;
     const verificationUrl = process.env.SHORT_URL + certId;
 
@@ -472,10 +625,27 @@ const generateBadgeOnIssue = async (req, res) => {
             course: course,
             hash: txHash,
             issuedDate: issuedDate,
-            badge: badgeUrl,
+            badgeTitle: isBadgeExist?.badgeTitle,
+            badgeImage: isBadgeExist?.badgeImage,
+            badgeDescription: isBadgeExist?.badgeDescription,
             blockchainUrl: linkUrl,
             verificationUrl: verificationUrl
         };
+
+        const badgeIssueDetails = new BadgeIssues({
+            email: email,
+            certificateNumber: certId,
+            name: name,
+            course: course,
+            hash: txHash,
+            badgeTitle: isBadgeExist?.badgeTitle,
+            badgeImage: isBadgeExist?.badgeImage,
+            badgeDescription: isBadgeExist?.badgeDescription,
+            blockchainUrl: linkUrl,
+            verificationUrl: verificationUrl
+        });
+
+        await badgeIssueDetails.save();
 
         // const issueBadge = JSON.stringify(badgeDetails);
         res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgBadgeIssued, details: badgeDetails });
@@ -506,6 +676,15 @@ module.exports = {
 
     // Function to fetch DB file and generate reports into excel file format
     generateExcelReport,
+
+    // Function to upload badge details
+    uploadBadge,
+
+    // Function to get badges
+    getBadges,
+
+    // Function to Delete the badge
+    deleteBadge,
 
     // Function to allocate badge to an issue
     generateBadgeOnIssue

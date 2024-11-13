@@ -192,6 +192,32 @@ const DynamicParamsSchema = new mongoose.Schema({
   modifiedDate: { type: Date, default: Date.now } // issueDate field is of type Date and defaults to the current date/time
 });
 
+// Define the schema for Blockchain Badges issued
+const BlockchainBadgesSchema = new mongoose.Schema({
+  email: { type: String },
+  badgeCode: { type: String },
+  badgeTitle: { type: String },
+  badgeImage: { type: String },
+  badgeDescription: {type: String },
+  badgeCriteria: { type: [String] },
+  modifiedDate: { type: Date, default: Date.now },
+  badgeActive: {type: Boolean, default: true}
+});
+
+// Define the schema for Blockchain Badges issued
+const BlockchainBadgeIssuesSchema = new mongoose.Schema({
+  email: { type: String },
+  certificateNumber: { type: String },
+  name: { type: String },
+  course: { type: String },
+  hash: { type: String },
+  badgeTitle: { type: String },
+  badgeImage: { type: String },
+  badgeDescription: {type: String },
+  blockchainUrl: { type: String },
+  verificationUrl: { type: String },
+  issuedDate: { type: Date, default: Date.now }
+});
 
 const Admin = mongoose.model('Admin', AdminSchema);
 const ServiceAccountQuotas = mongoose.model('ServiceAccountQuotas', ServiceAccountQuotasSchema);
@@ -205,6 +231,8 @@ const VerificationLog = mongoose.model('VerificationLog', VerificationLogSchema)
 const ShortUrl = mongoose.model('ShortUrl', ShortUrlSchema);
 const DynamicParameters = mongoose.model('DynamicParameters', DynamicParamsSchema);
 const ServerDetails = mongoose.model('ServerDetails', ServerDetailsSchema);
+const BadgeDetails = mongoose.model('BadgeDetails', BlockchainBadgesSchema);
+const BadgeIssues = mongoose.model('BadgeIssues', BlockchainBadgeIssuesSchema);
 
 module.exports = {
   Admin,
@@ -218,5 +246,7 @@ module.exports = {
   DynamicBatchIssues,
   VerificationLog,
   ShortUrl,
-  DynamicParameters
+  DynamicParameters,
+  BadgeDetails,
+  BadgeIssues
 };
