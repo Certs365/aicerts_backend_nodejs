@@ -13,6 +13,7 @@ module.exports = {
     msgPageNotFound: "Page not found",
     msgInternalError: "Unable to reach the server, Please try again...",
     msgWorkInProgress: "🚧 !⚠! Work In Porgress !⚠! 🚧",
+    msgEmailNote: "This is an automated email. Please do not reply directly to this message.",
 
     // Handle Excel File messages
     msgInvalidExcel: "Invalid Excel file, Please try again",

@@ -54,8 +54,11 @@ const issueProviders = [
   // Add more providers as needed
 ];
 
+
 // Create a new FallbackProvider instance
 const fallbackProvider = new ethers.FallbackProvider(providers);
+
+const messageCode = require("../common/codes");
 
 const excludeUrlContent = "/verify-documents";
 
@@ -1637,16 +1640,24 @@ const sendEmail = async (name, email) => {
     // Update the mailOptions object with the recipient's email address and email body
     mailOptions.to = email;
     mailOptions.subject = `Your Certs365 Account is Approved!`;
-    mailOptions.text = `Hi ${name},
-
-Congratulations! Your account has been successfully approved by our admin team.
-
-You can now log in to your profile using your username ${email}. We are excited to have you on board!
-
-If you have any questions or need assistance, feel free to reach out.
-
-Best regards,
-The Certs365 Team.`;
+    mailOptions.html = `
+<html>
+    <body style="font-family: Arial, sans-serif; color: #333; background-color: #f4f4f4; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+            <h3 style="color: #4CAF50;">Hi  <strong>${name}</strong>,</h3>
+            <p>Congratulations! Your account has been successfully approved by our admin team.</p>
+            <p>You can now log in to your profile using your username <strong>${email}</strong>. We are excited to have you on board!</p>
+            <p>If you have any questions or need assistance, feel free to reach out.</p>
+            <br>
+            <p>Best regards,</p>
+            <p>The Certs365 Team</p>
+            <hr>
+            <p style="font-size: 12px; color: #999;">
+                ${messageCode.msgEmailNote}
+            </p>
+        </div>
+    </body>
+</html>`;
 
     // Send the email using the configured transporter
     transporter.sendMail(mailOptions);
@@ -1669,14 +1680,28 @@ const rejectEmail = async (name, email) => {
     // Update the mailOptions object with the recipient's email address and email body
     mailOptions.to = email;
     mailOptions.subject = `Your Certs365 Account Registration Status`;
-    mailOptions.text = `Hi ${name},
-
-We regret to inform you that your account registration has been declined by our admin team.
-
-If you have any questions or need further clarification, please do not hesitate to contact us. Thank you for your interest in AICerts.
-
-Best regards,
-The Certs365 Team.`;
+    mailOptions.html = `
+<html>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; padding: 20px;">
+    <div style="max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px; background-color: #f9f9f9;">
+      <h3 style="color: #d9534f;">Hi ${name},</h3>
+      <p style="color: #555;">
+        We regret to inform you that your account registration has been <strong>declined</strong> by our admin team.
+      </p>
+      <p style="color: #555;">
+        If you have any questions or need further clarification, please do not hesitate to <a href="mailto:Noreply@certs365.io" style="color: #007bff; text-decoration: none;">contact us</a>.
+      </p>
+      <p style="color: #555;">Thank you for your interest in Certs365.</p>
+      <br>
+      <p style="font-weight: bold;">Best regards,</p>
+      <p><strong>The Certs365 Team</strong></p>
+      <hr>
+        <p style="font-size: 12px; color: #999;">
+        ${messageCode.msgEmailNote}
+        </p>
+    </div>
+  </body>
+</html>`;
 
     // Send the email using the configured transporter
     transporter.sendMail(mailOptions);
