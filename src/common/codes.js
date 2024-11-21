@@ -30,6 +30,8 @@ module.exports = {
     msgExcelHasExistingIds: "Excel file has Existing Credential IDs",
     msgInvalidHeaders: "Invalid / missing headers in the Excel file.",
     msgExcelSheetname: "The Excel file Sheet name should be - Batch.",
+    msgVerifyExcelSheetname: "The Excel file Sheet name should be - Validation.",
+    msgNoIdsFound: "The Excel file found no records for Validation.",
     msgMissingDetailsInExcel: "The Excel file has missing fields, Please fill all required fields and try again",
     msgFailedToIssueAfterRetry: "Failed to issue credential after retries. Please try again...",
     msgFailedToGrantRoleRetry: "Failed to Grant Role after retries. Please try again...",
@@ -191,6 +193,7 @@ module.exports = {
     msgInvalidCert: "Invalid Credential",
     msgCertRevoked: "Credential has revoked",
     msgCertExpired: "Credential has expired",
+    msgInvalidFileFormat: "Invalid file format (must be zip, excel, pdf), Please check and try again.",
 
     // Admin dashboard & Graph Analytics
     msgInvalidGraphInput: "Please provide valid Graph Input",

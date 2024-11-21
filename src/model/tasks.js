@@ -17,6 +17,7 @@ const moment = require('moment');
 
 const { decryptData } = require("../common/cryptoFunction"); // Custom functions for cryptographic operations
 
+const cloudBucket = '.png';
 const retryDelay = parseInt(process.env.TIME_DELAY);
 const maxRetries = 3; // Maximum number of retries
 const schedule_days = parseInt(process.env.UPDATE_QUOTAS_DAYS) || 7;
@@ -1862,7 +1863,65 @@ const generateCustomFolder = async (folderName) => {
   } catch (error) {
     console.error("Error occuered while generating custom folder name", error);
   }
-}
+};
+
+// Function to verify the ID with DB
+const verificationWithDatabase = async (certId) => {
+  if (!certId) {
+    return 0;
+  }
+
+  var resultCert = 0;
+
+  try {
+    await isDBConnected();
+
+    const commonFilter = {
+      certificateNumber: { $in: certId },
+      url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket }
+    };
+
+    // Fetch all issues across different models
+    const [issues, batchIssues, dynamicIssues, dynamicBatchIssues] = await Promise.all([
+      Issues.find(commonFilter, { certificateStatus: 1 }).lean(),
+      BatchIssues.find(commonFilter, { certificateStatus: 1 }).lean(),
+      DynamicIssues.find(commonFilter, { certificateStatus: 1 }).lean(),
+      DynamicBatchIssues.find(commonFilter, { certificateStatus: 1 }).lean()
+    ]);
+
+    // Organize issues based on their source
+    const result = {
+      issues,
+      batchIssues,
+      dynamicIssues,
+      dynamicBatchIssues,
+    };
+
+    // Log the response if any array has a length of 1
+    Object.entries(result).forEach(([key, value]) => {
+      if (value && value.length === 1) {
+        // console.log(`The response for '${key}' has exactly 1 item:`, value);
+        resultCert = value;
+      }
+    });
+
+    if (resultCert != 0) {
+      // console.log("The result:", resultCert, resultCert[0]?.certificateStatus);
+      var statusResponse = resultCert[0]?.certificateStatus;
+      if(statusResponse == 3){
+        return 3;
+      }
+      return 1;
+    }
+
+    return 0;
+
+  } catch (error) {
+    console.error("An error occured while fetching data ", error);
+    return 0;
+  }
+
+};
 
 module.exports = {
 
@@ -2010,4 +2069,7 @@ module.exports = {
   getLatestTransferDate,
 
   generateCustomFolder,
+
+  // Function to verify the ID with DB
+  verificationWithDatabase,
 };

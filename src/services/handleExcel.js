@@ -8,6 +8,7 @@ const {
   isCertificationIdExisted,
   wipeSourceFolder,
   generateCustomFolder,
+  verificationWithDatabase,
 } = require("../model/tasks"); // Importing functions from the '../model/tasks' module
 
 // Import MongoDB models
@@ -21,6 +22,7 @@ const min_length = 6;
 const max_length = 50;
 const cert_limit = parseInt(process.env.BATCH_LIMIT);
 const sheetName = process.env.SHEET_NAME || "Batch";
+const validationSheetName = "Validation";
 
 // Regular expression to match MM/DD/YY format
 const regex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/;
@@ -42,8 +44,14 @@ const expectedBulkHeadersSchema = [
   "name"
 ];
 
+const verificationStatus = [
+  "valid",
+  "invalid",
+  "revoked"
+]
+
 const messageCode = require("../common/codes");
-const { cleanUpJobs, _cleanUpJobs, addJobsInChunks, processExcelJob, cleanRedis } = require("../queue_service/queueUtils");
+const { cleanUpJobs, _cleanUpJobs, addJobsInChunks, processExcelJob } = require("../queue_service/queueUtils");
 
 const handleExcelFile = async (_path) => {
   if (!_path) {
@@ -412,6 +420,122 @@ const handleBulkExcelFile = async (_path) => {
   } catch (error) {
     console.error('Error fetching record:', error);
     return { status: "FAILED", response: false, message: messageCode.msgProvideValidExcel };
+  }
+};
+
+const handleCustomBatch = async (_path) => {
+  if (!_path) {
+    return { status: "FAILED", response: false, message: "Failed to provide excel file" };
+  }
+  // api to fetch excel data into json
+  const newPath = path.join(..._path.split("\\"));
+  const sheetNames = await readXlsxFile.readSheetNames(newPath);
+  if (sheetNames[0] != validationSheetName || sheetNames.length != 1) {
+    return { status: "FAILED", response: false, message: messageCode.msgInvalidExcelSheets, Details: sheetNames };
+  }
+  try{
+    if (sheetNames == validationSheetName || sheetNames.includes(validationSheetName)) {
+      // api to fetch excel data into json
+      const rows = await readXlsxFile(newPath, { sheet: validationSheetName });
+  console.log("Excel request: ", rows, rows.length);
+      if ( rows.length > 1) {
+        const headers = rows.shift();
+        const targetData = rows.map((row) => {
+          const obj = {};
+          headers.forEach((header, index) => {
+            obj[header] = row[index];
+          });
+          return obj; // Return the fetched rows
+        });
+
+        // Limit Records to certain limit in the Batch
+        if (rows && rows.length > cert_limit && cert_limit != 0) {
+          return {
+            status: "FAILED",
+            response: false,
+            message: `${messageCode.msgExcelLimit}: ${cert_limit}`,
+            Details: `Input Records : ${rows.length}`,
+          };
+        }
+
+        // Batch Certification Formated Details
+        var rawBatchData = targetData;
+
+        var certificationIDs = rawBatchData.map((item) => item.certificationID);
+
+        var notNullCertificationIDs = certificationIDs.filter(
+          (item) => item == null
+        );
+
+        if (
+          notNullCertificationIDs.length != 0 
+        ) {
+          return {
+            status: "FAILED",
+            response: false,
+            message: messageCode.msgMissingDetailsInExcel,
+          };
+        }
+
+        // Initialize an empty list to store matching IDs
+        const matchingIDs = [];
+
+        const invalidIdList = await validateBatchCertificateIDs(
+          certificationIDs
+        );
+
+        if (invalidIdList != false) {
+          return {
+            status: "FAILED",
+            response: false,
+            message: messageCode.msgInvalidCertIds,
+            Details: invalidIdList,
+          };
+        }
+
+        // Assuming BatchIssues is your MongoDB model
+        for (const id of certificationIDs) {
+          const issueExist = await isCertificationIdExisted(id);
+          if (issueExist) {
+            matchingIDs.push(id);
+          }
+        }
+
+        if (matchingIDs.length > 0) {
+          return {
+            status: "FAILED",
+            response: false,
+            message: messageCode.msgExcelHasExistingIds,
+            Details: matchingIDs,
+          };
+        }
+        return {
+          status: "SUCCESS",
+          response: true,
+          message: [targetData, rows.length, rows],
+        };
+      } else {
+        return {
+          status: "FAILED",
+          response: false,
+          message: messageCode.msgNoIdsFound,
+        };
+      }
+    } else {
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgVerifyExcelSheetname,
+      };
+    }
+
+  } catch (error) {
+    console.error("Error fetching record:", error);
+    return {
+      status: "FAILED",
+      response: false,
+      message: messageCode.msgProvideValidExcel,
+    };
   }
 };
 
@@ -1084,4 +1208,4 @@ const waitForJobsToComplete = async (jobs) => {
   }
 };
 
-module.exports = { handleExcelFile, handleBulkExcelFile, handleBatchExcelFile, validateDynamicBatchCertificateIDs, validateDynamicBatchCertificateNames, getExcelRecordsCount };
+module.exports = { handleExcelFile, handleBulkExcelFile, handleBatchExcelFile, handleCustomBatch, validateDynamicBatchCertificateIDs, validateDynamicBatchCertificateNames, getExcelRecordsCount };

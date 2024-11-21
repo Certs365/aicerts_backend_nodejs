@@ -22,6 +22,8 @@ const storage = multer.diskStorage({
   // Initialize multer with configured storage and file filter
   const _upload = multer({ storage, fileFilter });
 
+  const upload = multer({ dest: "./uploads/" });
+
 /**
  * @swagger
  * /api/verify:
@@ -106,6 +108,79 @@ const storage = multer.diskStorage({
  */
 
 router.post('/verify', _upload.single("pdfFile"), adminController.verify);
+
+/**
+ * @swagger
+ * /api/verify-custom:
+ *   post:
+ *     summary: Verify the Certification with QR / Zip / Excel  - Blockchain URL
+ *     description: API Verify the Certification with QR / Zip / Excel - Blockchain URL. 
+ *     tags: [Verification]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: PDF/Zip/Excel file containing certificates to be verified.
+ *             required:
+ *                - file
+ *           example:
+ *             status: "FAILED"
+ *             error: Internal Server Error
+ *     responses:
+ *       '200':
+ *         description: Certificate / Upload verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 details:
+ *                   type: string
+ *             example:
+ *               code: 200
+ *               status: "SUCCESS"
+ *               message: Verification result message.
+ *       '400':
+ *         description: Certificate is not valid or other error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *             example:
+ *               code: 400
+ *               status: "FAILED"
+ *               message: Certificate / upload is not valid or other error.
+ *       '500':
+ *         description: Internal Server Error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *             example:
+ *               code: 500
+ *               status: "FAILED"
+ *               message: Internal Server Error.
+ */
+
+router.post('/verify-custom', upload.single("file"), adminController.verifyCustom);
 
 /**
  * @swagger

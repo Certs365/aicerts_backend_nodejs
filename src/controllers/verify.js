@@ -4,10 +4,13 @@ require('dotenv').config();
 // Import required modules
 const fs = require("fs");
 const path = require("path"); // Module for working with file paths
+var FormData = require('form-data');
 const { ethers } = require("ethers"); // Ethereum JavaScript library
 const { validationResult } = require("express-validator");
 // Import custom cryptoFunction module for encryption and decryption
 const { decryptData, generateEncryptedUrl } = require("../common/cryptoFunction");
+// Import MongoDB models
+const { Issues, BatchIssues, DynamicIssues, DynamicBatchIssues } = require("../config/schema");
 
 const pdf = require("pdf-lib"); // Library for creating and modifying PDF documents
 const { PDFDocument } = pdf;
@@ -25,14 +28,20 @@ const {
   holdExecution,
   checkTransactionStatus,
   renameUploadPdfFile,
-  wipeSourceFile
+  wipeSourceFile,
+  verificationWithDatabase
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
+
+const {
+  handleCustomBatch
+} = require('../services/handleExcel');
 
 var messageCode = require("../common/codes");
 const e = require('express');
 const uploadsPath = path.join(__dirname, '../../uploads');
 
 const urlLimit = process.env.MAX_URL_SIZE || 50;
+
 
 /**
  * Verify Certification page with PDF QR - Blockchain URL.
@@ -49,15 +58,7 @@ const verify = async (req, res) => {
   var certificateS3Url;
   var responseUrl;
   var verificationResponse;
-  // Get today's date
-  const getTodayDate = async () => {
-    const today = new Date();
-    const month = String(today.getMonth() + 1).padStart(2, '0'); // Add leading zero if month is less than 10
-    const day = String(today.getDate()).padStart(2, '0'); // Add leading zero if day is less than 10
-    const year = today.getFullYear();
-    return `${month}/${day}/${year}`;
-  };
-  const todayDate = await getTodayDate();
+
   // Rename the file by replacing the original file path with the new file name
   const newFilePath = await renameUploadPdfFile(file);
   if (newFilePath) {
@@ -79,7 +80,7 @@ const verify = async (req, res) => {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertNotValid });
     }
 
-    if (certificateData.startsWith(process.env.START_URL) || certificateData.startsWith(process.env.START_VERIFY_URL)) {
+    if (certificateData.startsWith(process.env.START_VERIFY_URL)) {
       var urlSize = certificateData.length;
       if (urlSize < urlLimit) {
         // Parse the URL
@@ -393,10 +394,10 @@ const decodeQRScan = async (req, res) => {
               "Polygon URL": `${process.env.NETWORK}/tx/${isDynamicCertificateExist.transactionHash}`,
               "type": isDynamicCertificateExist.type,
               "url": originalUrl,
-              "certificateUrl" : isDynamicCertificateExist.url
+              "certificateUrl": isDynamicCertificateExist.url
             }
 
-            if(isDynamicCertificateExist.certificateStatus == 3){
+            if (isDynamicCertificateExist.certificateStatus == 3) {
               return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertRevoked });
             }
 
@@ -688,7 +689,7 @@ const verifyCertificationId = async (req, res) => {
         if (inputFileExist) {
         }
 
-        if(isDynamicCertificateExist.certificateStatus == 3){
+        if (isDynamicCertificateExist.certificateStatus == 3) {
           return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertRevoked });
         }
 
@@ -709,10 +710,241 @@ const verifyCertificationId = async (req, res) => {
   }
 };
 
+/**
+ * Verify Certification page with PDF QR / Zip / Excel  - Blockchain URL.
+ *
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
+const verifyCustom = async (req, res) => {
+  // Extracting file path from the request
+  var file = req?.file.path;
+  console.log("file path", req.file.originalname);
+  // Extract the file extension
+  const fileExtension = path.extname(req.file.originalname);
+
+  var verificationResponse = {
+    code: 400,
+    status: "FAILED",
+    message: messageCode.msgCertNotValid
+  };
+
+  const acceptableFormats = [
+    '.pdf',
+    '.xlsx',
+    '.zip'
+  ];
+
+  if (fileExtension != acceptableFormats[0] && fileExtension != acceptableFormats[1] && fileExtension != acceptableFormats[2]) {
+    await wipeSourceFile(req.file.path);
+    return res.status(400).json({
+      code: 400,
+      status: "FAILED",
+      message: messageCode.msgInvalidFileFormat
+    });
+  }
+
+  try {
+
+    // Dynamically import fetch
+    const { default: fetch } = await import('node-fetch');
+
+    if (fileExtension == acceptableFormats[0]) { // file has .pdf extension
+
+      // const host = process.env.HOST;
+      // const port = process.env.PORT;
+      // const hostUrl = `${host}:${port}/`;
+
+      // // Extract the body from the incoming request
+      // const requestFile = req?.file;
+
+      // const formData = new FormData();
+      // // If file is stored on disk
+      // const fileBuffer = fs.readFileSync(requestFile.path);
+
+      // formData.append("pdfFile", fileBuffer, {
+      //   filename: requestFile.originalname,
+      //   contentType: requestFile.mimetype,
+      // });
+
+      // // Call the external API, passing the request body
+      // const response = await fetch(`${hostUrl}api/verify`, {
+      //   method: 'POST', // Use POST for a body
+      //   body: formData // Convert the body to JSON string
+      // });
+
+      // if(!response){
+      //   return res.status(400).json({
+      //     code: 400,
+      //     status: "FAILED",
+      //     message: messageCode.msgInternalError,
+      //     details: error
+      //   });
+      // }
+      // const result = await response.json();
+      // // console.log("Response from verify API:", result);
+      // await wipeSourceFile(req.file.path);
+      // return res.status(result.code).json({
+      //   code: result.code,
+      //   status: result.status,
+      //   message: result.message,
+      //   details: result.details
+      // });
+
+      // Rename the file by replacing the original file path with the new file name
+      var fileBuffer = fs.readFileSync(file);
+      var pdfDoc = await PDFDocument.load(fileBuffer);
+      var blockchainResponse;
+      var verificationResponse;
+      var responseCode = 200;
+      var responseStatus = 'SUCCESS';
+      var messageResponse = messageCode.msgCertValid;
+
+      const newFilePath = await renameUploadPdfFile(file);
+      if (newFilePath) {
+        // Update req.file.path to reflect the new file path
+        req.file.path = newFilePath;
+      }
+
+      if (pdfDoc.getPageCount() > 1) {
+        await wipeSourceFile(req.file.path);
+        return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgMultiPagePdf });
+      }
+
+      try {
+        // Extract QR code data from the PDF file
+        const certificateData = await extractQRCodeDataFromPDF(req.file.path);
+
+        if (!certificateData) {
+          res.status(400).json(verificationResponse);
+          await wipeSourceFile(req.file.path);
+          return;
+        }
+
+        if (certificateData.startsWith(process.env.START_VERIFY_URL)) {
+          // Parse the URL
+          const parsedUrl = new URL(certificateData);
+          // Extract the query parameter
+          const certificationNumber = parsedUrl.searchParams.get('');
+
+          // Validate with blockchain call
+          // blockchainResponse = await verifySingleCertificationWithRetry(certificationNumber);
+
+          // if (blockchainResponse != 0 && (blockchainResponse == 1 || blockchainResponse == 3)) {
+          //   if (blockchainResponse == 3) {
+          //     responseCode = 400;
+          //     responseStatus = 'FAILED';
+          //     messageResponse = messageCode.msgCertRevoked;
+          //   }
+          //   res.status(responseCode).json({ code: responseCode, status: responseStatus, message: messageResponse });
+          //   await wipeSourceFile(req.file.path);
+          //   return;
+          // }
+
+          const verificationDatabase = await verificationWithDatabase(certificationNumber);
+          console.log("response res", verificationDatabase)
+
+          if (verificationDatabase != 0 && (verificationDatabase == 1 || verificationDatabase == 3)) {
+            if (verificationDatabase == 3) {
+              responseCode = 400;
+              responseStatus = 'FAILED';
+              messageResponse = messageCode.msgCertRevoked;
+            }
+            res.status(responseCode).json({ code: responseCode, status: responseStatus, message: messageResponse });
+            await wipeSourceFile(req.file.path);
+            return;
+          }
+
+          res.status(400).json(verificationResponse);
+          await wipeSourceFile(req.file.path);
+          return;
+
+        } else if (certificateData.startsWith(process.env.START_LMS)) {
+          var [extractQRData, encodedUrl] = await extractCertificateInfo(certificateData);
+          if (!extractQRData["Certificate Number"]) {
+            extractQRData = await extractCertificateInformation(certificateData);
+          }
+          if (extractQRData["Polygon URL"] == undefined) {
+            await wipeSourceFile(req.file.path);
+            return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
+          }
+          if (extractQRData) {
+            var verifyLog = {
+              issuerId: 'default',
+              course: extractQRData["Course Name"],
+            };
+            await verificationLogEntry(verifyLog);
+
+            await wipeSourceFile(req.file.path);
+            extractQRData["Polygon URL"] = await modifyPolygonURL(extractQRData["Polygon URL"]);
+            // Extract the transaction hash from the URL
+            let transactionHash = extractQRData["Polygon URL"].split('/').pop();
+            if (transactionHash) {
+              let txStatus = await checkTransactionStatus(transactionHash);
+              extractQRData.blockchainStatus = txStatus;
+            }
+            res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgCertValid, details: extractQRData });
+            await wipeSourceFile(req.file.path);
+            return;
+          }
+          await wipeSourceFile(req.file.path);
+          return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
+
+        } else {
+          await wipeSourceFile(req.file.path);
+          return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
+        }
+
+      } catch (error) {
+
+        res.status(400).json(verificationResponse);
+        await wipeSourceFile(req.file.path);
+        return;
+      }
+
+    } else if (fileExtension == acceptableFormats[1]) {
+      const excelResponse = await handleCustomBatch(req.file.path);
+      await wipeSourceFile(req.file.path);
+      console.log("Excel response: ", excelResponse);
+      const statusCode = (excelResponse?.response) ? 200 : 400;
+      const excelStatus = excelResponse?.status;
+      const excelMessage = excelResponse?.message;
+      const excelDetails = excelResponse?.Details;
+      return res.status(statusCode).json({
+        code: statusCode,
+        status: excelStatus,
+        message: excelMessage,
+        details: excelDetails
+      });
+    } else if (fileExtension == acceptableFormats[2]) {
+      await wipeSourceFile(req.file.path);
+      return res.status(400).json({
+        code: 400,
+        status: "FAILED",
+        message: messageCode.msgInvalidFile,
+        details: excelResponse
+      });
+    }
+
+    await wipeSourceFile(req.file.path);
+    return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
+        
+  } catch (error) {
+    await wipeSourceFile(req.file.path);
+    return res.status(500).json({
+      code: 500,
+      status: "FAILED",
+      message: messageCode.msgInternalError,
+      details: error
+    });
+  }
+};
+
+
 // Function to verify the ID (Single) with Smart Contract with Retry
 const verifySingleCertificationWithRetry = async (certificateId, retryCount = 3) => {
   const newContract = await connectToPolygon();
-  if(!newContract){
+  if (!newContract) {
     return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
   }
   try {
@@ -754,7 +986,7 @@ const verifySingleCertificationWithRetry = async (certificateId, retryCount = 3)
 // Function to verify the ID (Batch) with Smart Contract with Retry
 const verifyBatchCertificationWithRetry = async (batchNumber, dataHash, proof, hashProof, retryCount = 3) => {
   const newContract = await connectToPolygon();
-  if(!newContract){
+  if (!newContract) {
     return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
   }
   try {
@@ -815,6 +1047,9 @@ const hasFilesInDirectory = async (directoryPath) => {
 module.exports = {
   // Function to verify a certificate with a PDF QR code
   verify,
+
+  // Function to verify Certification page with PDF QR / Zip / Excel
+  verifyCustom,
 
   // Function to verify a Single/Batch certification with an ID
   verifyCertificationId,
