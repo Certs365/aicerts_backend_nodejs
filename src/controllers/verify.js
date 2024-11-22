@@ -915,7 +915,7 @@ const verifyCustom = async (req, res) => {
       });
     } else if (fileExtension == acceptableFormats[2]) {
       const csvResponse = await handleCustomBatchCsv(req.file.path, columnIndex);
-      console.log("Excel response: ", csvResponse);
+      console.log("CSV response: ", csvResponse);
       const statusCode = (csvResponse?.response) ? 200 : 400;
       const csvStatus = csvResponse?.status;
       const csvMessage = csvResponse?.message;
