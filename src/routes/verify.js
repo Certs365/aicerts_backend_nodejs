@@ -113,8 +113,8 @@ router.post('/verify', _upload.single("pdfFile"), adminController.verify);
  * @swagger
  * /api/verify-custom:
  *   post:
- *     summary: Verify the Certification with QR / Zip / Excel  - Blockchain URL
- *     description: API Verify the Certification with QR / Zip / Excel - Blockchain URL. 
+ *     summary: Verify the Certification with QR / Excel / CSV  - Blockchain URL
+ *     description: API Verify the Certification with QR / Excel / CSV - Blockchain URL. 
  *     tags: [Verification]
  *     security:
  *       - BearerAuth: []
@@ -128,7 +128,10 @@ router.post('/verify', _upload.single("pdfFile"), adminController.verify);
  *               file:
  *                 type: string
  *                 format: binary
- *                 description: PDF/Zip/Excel file containing certificates to be verified.
+ *                 description: PDF/Excel/csv file containing certificates to be verified.
+ *               column:
+ *                 type: number
+ *                 description: Specify the column position/index (if upload excel / CSV file) of desired credentials list (optional).
  *             required:
  *                - file
  *           example:

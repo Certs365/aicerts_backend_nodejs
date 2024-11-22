@@ -7,6 +7,8 @@ const path = require("path"); // Module for working with file paths
 var FormData = require('form-data');
 const { ethers } = require("ethers"); // Ethereum JavaScript library
 const { validationResult } = require("express-validator");
+const readXlsxFile = require("read-excel-file/node");
+const { parse } = require("csv-parse");
 // Import custom cryptoFunction module for encryption and decryption
 const { decryptData, generateEncryptedUrl } = require("../common/cryptoFunction");
 // Import MongoDB models
@@ -32,16 +34,10 @@ const {
   verificationWithDatabase
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
 
-const {
-  handleCustomBatch
-} = require('../services/handleExcel');
-
 var messageCode = require("../common/codes");
-const e = require('express');
 const uploadsPath = path.join(__dirname, '../../uploads');
 
 const urlLimit = process.env.MAX_URL_SIZE || 50;
-
 
 /**
  * Verify Certification page with PDF QR - Blockchain URL.
@@ -711,7 +707,7 @@ const verifyCertificationId = async (req, res) => {
 };
 
 /**
- * Verify Certification page with PDF QR / Zip / Excel  - Blockchain URL.
+ * Verify Certification page with PDF QR / Excel  - Blockchain URL.
  *
  * @param {Object} req - Express request object.
  * @param {Object} res - Express response object.
@@ -722,7 +718,8 @@ const verifyCustom = async (req, res) => {
   console.log("file path", req.file.originalname);
   // Extract the file extension
   const fileExtension = path.extname(req.file.originalname);
-
+  let _columnIndex = parseInt(req.body.column) || 1;
+  const columnIndex = _columnIndex > 0 ? _columnIndex - 1 : 0;
   var verificationResponse = {
     code: 400,
     status: "FAILED",
@@ -732,7 +729,7 @@ const verifyCustom = async (req, res) => {
   const acceptableFormats = [
     '.pdf',
     '.xlsx',
-    '.zip'
+    '.csv'
   ];
 
   if (fileExtension != acceptableFormats[0] && fileExtension != acceptableFormats[1] && fileExtension != acceptableFormats[2]) {
@@ -828,18 +825,18 @@ const verifyCustom = async (req, res) => {
           const certificationNumber = parsedUrl.searchParams.get('');
 
           // Validate with blockchain call
-          // blockchainResponse = await verifySingleCertificationWithRetry(certificationNumber);
+          blockchainResponse = await verifySingleCertificationWithRetry(certificationNumber);
 
-          // if (blockchainResponse != 0 && (blockchainResponse == 1 || blockchainResponse == 3)) {
-          //   if (blockchainResponse == 3) {
-          //     responseCode = 400;
-          //     responseStatus = 'FAILED';
-          //     messageResponse = messageCode.msgCertRevoked;
-          //   }
-          //   res.status(responseCode).json({ code: responseCode, status: responseStatus, message: messageResponse });
-          //   await wipeSourceFile(req.file.path);
-          //   return;
-          // }
+          if (blockchainResponse != 0 && (blockchainResponse == 1 || blockchainResponse == 3)) {
+            if (blockchainResponse == 3) {
+              responseCode = 400;
+              responseStatus = 'FAILED';
+              messageResponse = messageCode.msgCertRevoked;
+            }
+            res.status(responseCode).json({ code: responseCode, status: responseStatus, message: messageResponse });
+            await wipeSourceFile(req.file.path);
+            return;
+          }
 
           const verificationDatabase = await verificationWithDatabase(certificationNumber);
           console.log("response res", verificationDatabase)
@@ -903,13 +900,13 @@ const verifyCustom = async (req, res) => {
       }
 
     } else if (fileExtension == acceptableFormats[1]) {
-      const excelResponse = await handleCustomBatch(req.file.path);
-      await wipeSourceFile(req.file.path);
+      const excelResponse = await handleCustomBatchExcel(req.file.path, columnIndex);
       console.log("Excel response: ", excelResponse);
       const statusCode = (excelResponse?.response) ? 200 : 400;
       const excelStatus = excelResponse?.status;
       const excelMessage = excelResponse?.message;
       const excelDetails = excelResponse?.Details;
+      await wipeSourceFile(req.file.path);
       return res.status(statusCode).json({
         code: statusCode,
         status: excelStatus,
@@ -917,18 +914,27 @@ const verifyCustom = async (req, res) => {
         details: excelDetails
       });
     } else if (fileExtension == acceptableFormats[2]) {
+      const csvResponse = await handleCustomBatchCsv(req.file.path, columnIndex);
+      console.log("Excel response: ", csvResponse);
+      const statusCode = (csvResponse?.response) ? 200 : 400;
+      const csvStatus = csvResponse?.status;
+      const csvMessage = csvResponse?.message;
+      const csvDetails = csvResponse?.Details;
+      await wipeSourceFile(req.file.path);
+      return res.status(statusCode).json({
+        code: statusCode,
+        status: csvStatus,
+        message: csvMessage,
+        details: csvDetails
+      });
+    } else {
       await wipeSourceFile(req.file.path);
       return res.status(400).json({
         code: 400,
         status: "FAILED",
-        message: messageCode.msgInvalidFile,
-        details: excelResponse
+        message: messageCode.msgInvalidFile
       });
     }
-
-    await wipeSourceFile(req.file.path);
-    return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
-        
   } catch (error) {
     await wipeSourceFile(req.file.path);
     return res.status(500).json({
@@ -1044,6 +1050,218 @@ const hasFilesInDirectory = async (directoryPath) => {
   }
 }
 
+// Function to handle custom Batch Excel
+const handleCustomBatchExcel = async (_path, _index) => {
+  const verificationStatus = [
+    "invalid",
+    "valid",
+    'NA',
+    "revoked",
+  ];
+
+  if (!_path) {
+    return { status: "FAILED", response: false, message: "Failed to provide excel file" };
+  }
+  // api to fetch excel data into json
+  const newPath = path.join(..._path.split("\\"));
+  try {
+    // api to fetch excel data into json
+    const rows = await readXlsxFile(newPath);
+    const targetColumn = rows
+      .map(row => row[_index])
+      .filter(value => value !== null); // Remove null values
+
+    const allUndefined = targetColumn.every(item => item === undefined);
+    // console.log("Excel request: ", allUndefined, rows, targetColumn, targetColumn.length, _index);
+
+    if (allUndefined) {
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgNoIdsFound,
+      };
+    }
+
+    if (targetColumn.length > 1) {
+
+      // Batch Certification Formated Details
+      var notNullCertificationIDs = targetColumn.slice(1);
+
+
+      // Initialize an empty list to store matching IDs
+      const validChainResponse = [];
+      const validCertStatus = [];
+
+      // Assuming verify Issues is from blockchain
+      // for (const certId of notNullCertificationIDs) {
+      //   var validCertStatus = await verifySingleCertificationWithRetry(certId);
+      //   validChainResponse.push(validCertStatus);
+      // }
+
+      // Assuming Issues is your MongoDB model
+      for (const id of notNullCertificationIDs) {
+        const validStatus = await verificationWithDatabase(id);
+        validCertStatus.push(validStatus);
+      }
+
+      if (validCertStatus.length > 0) {
+
+        // Map the data2 values to the corresponding verificationStatus based on the index
+        const mergedStatus = notNullCertificationIDs.map((id, index) => {
+          const statusIndex = validCertStatus[index]; // Convert to 0-based index
+          const status = verificationStatus[statusIndex] || "NA"; // Handle out-of-range indices
+          return { id, status };
+        });
+
+        // console.log("The extracted data ", notNullCertificationIDs, validCertStatus, mergedStatus);
+        return {
+          status: "SUCCESS",
+          response: true,
+          message: messageCode.msgBatchVerification,
+          Details: mergedStatus
+        };
+
+      }
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgExcelHasExistingIds,
+        Details: [notNullCertificationIDs],
+      };
+    } else {
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgNoIdsFound,
+      };
+    }
+
+  } catch (error) {
+    console.error("Error fetching record:", error);
+    return {
+      status: "FAILED",
+      response: false,
+      message: messageCode.msgProvideValidExcel,
+    };
+  }
+};
+
+// Function to handle custom Batch CSV
+const handleCustomBatchCsv = async (_path, _index) => {
+  const verificationStatus = [
+    "invalid",
+    "valid",
+    'NA',
+    "revoked",
+  ];
+
+  if (!_path) {
+    return { status: "FAILED", response: false, message: "Failed to provide excel file" };
+  }
+  // api to fetch excel data into json
+  const newPath = path.join(..._path.split("\\"));
+  try {
+    const rows = []
+    // Create a read stream and pipe it to csv-parse
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(newPath)
+        .pipe(
+          parse({
+            skip_empty_lines: true, // Ignore empty lines
+          })
+        )
+        .on("data", (row) => {
+          rows.push(row); // Add each row (as an array) to the rows array
+        })
+        .on("end", resolve)
+        .on("error", reject);
+    });
+
+    // Extract the target column based on the given index
+    const targetColumn = rows
+      .map((row) => row[_index]) // Extract the column at _index
+      .filter((value) => value !== null && value !== ''); // Remove null/undefined values
+    if (targetColumn.length == 0) {
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgNoIndexColumnFound,
+      };
+    }
+    // const allUndefined = targetColumn.every(item => item === undefined);
+    // console.log("CSV request: ", allUndefined, rows, targetColumn, targetColumn.length, _index);
+
+    // if (allUndefined) {
+    //   return {
+    //     status: "FAILED",
+    //     response: false,
+    //     message: messageCode.msgNoIdsFound,
+    //   };
+    // }
+
+    if (targetColumn.length > 1) {
+
+      // Batch Certification Formated Details
+      var notNullCertificationIDs = targetColumn.slice(1);
+
+      // Initialize an empty list to store matching IDs
+      const validChainResponse = [];
+      const validCertStatus = [];
+
+      // Assuming verify Issues is from blockchain
+      // for (const certId of notNullCertificationIDs) {
+      //   var validCertStatus = await verifySingleCertificationWithRetry(certId);
+      //   validChainResponse.push(validCertStatus);
+      // }
+
+      // Assuming Issues is your MongoDB model
+      for (const id of notNullCertificationIDs) {
+        const validStatus = await verificationWithDatabase(id);
+        validCertStatus.push(validStatus);
+      }
+
+      if (validCertStatus.length > 0) {
+
+        // Map the data2 values to the corresponding verificationStatus based on the index
+        const mergedStatus = notNullCertificationIDs.map((id, index) => {
+          const statusIndex = validCertStatus[index]; // Convert to 0-based index
+          const status = verificationStatus[statusIndex] || "NA"; // Handle out-of-range indices
+          return { id, status };
+        });
+
+        console.log("The extracted data ", notNullCertificationIDs, validCertStatus, mergedStatus);
+        return {
+          status: "SUCCESS",
+          response: true,
+          message: messageCode.msgBatchVerification,
+          Details: mergedStatus
+        };
+
+      }
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgExcelHasExistingIds,
+        Details: [notNullCertificationIDs],
+      };
+    } else {
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgNoIdsFound,
+      };
+    }
+
+  } catch (error) {
+    console.error("Error fetching record:", error);
+    return {
+      status: "FAILED",
+      response: false,
+      message: messageCode.msgProvideValidExcel,
+    };
+  }
+};
+
 module.exports = {
   // Function to verify a certificate with a PDF QR code
   verify,
@@ -1058,5 +1276,7 @@ module.exports = {
   decodeCertificate,
 
   // Function to verify a certificate with a Scanned Short url/Original url based QR code
-  decodeQRScan
+  decodeQRScan,
+
+  verifySingleCertificationWithRetry
 };

@@ -1870,7 +1870,6 @@ const verificationWithDatabase = async (certId) => {
   if (!certId) {
     return 0;
   }
-
   var resultCert = 0;
 
   try {
@@ -1878,7 +1877,7 @@ const verificationWithDatabase = async (certId) => {
 
     const commonFilter = {
       certificateNumber: { $in: certId },
-      url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket }
+      // url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket }
     };
 
     // Fetch all issues across different models

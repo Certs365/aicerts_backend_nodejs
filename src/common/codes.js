@@ -31,7 +31,9 @@ module.exports = {
     msgInvalidHeaders: "Invalid / missing headers in the Excel file.",
     msgExcelSheetname: "The Excel file Sheet name should be - Batch.",
     msgVerifyExcelSheetname: "The Excel file Sheet name should be - Validation.",
-    msgNoIdsFound: "The Excel file found no records for Validation.",
+    msgNoIdsFound: "The Excel file has no records in the specified column for Validation.",
+    msgBatchVerification: "Batch verification completed",
+    msgNoIndexColumnFound: "The file has no records in the specified index value, Please check and try again.",
     msgMissingDetailsInExcel: "The Excel file has missing fields, Please fill all required fields and try again",
     msgFailedToIssueAfterRetry: "Failed to issue credential after retries. Please try again...",
     msgFailedToGrantRoleRetry: "Failed to Grant Role after retries. Please try again...",
@@ -57,6 +59,7 @@ module.exports = {
     msgUnableToConvert: "Unable to convert the file, please check file format data and upload again...",
     msgMultipagePdfError: "Multiple-page PDF documents are not allowed. Please try again with a valid single-page PDF",
     msgProvideValidExcel: "Excel file has invalid details, Please verify and try again...",
+    msgProvideValidCsv: "CSV file has invalid details, Please verify and try again...",
     msgNoHeaderSpecified: "Data entered without a corresponding header.",
 
 
