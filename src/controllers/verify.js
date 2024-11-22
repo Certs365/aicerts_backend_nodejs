@@ -1229,7 +1229,7 @@ const handleCustomBatchCsv = async (_path, _index) => {
           return { id, status };
         });
 
-        console.log("The extracted data ", notNullCertificationIDs, validCertStatus, mergedStatus);
+        // console.log("The extracted data ", notNullCertificationIDs, validCertStatus, mergedStatus);
         return {
           status: "SUCCESS",
           response: true,
