@@ -15,12 +15,15 @@ const {
   isValidIssuer,
   connectToPolygon,
   isDBConnected, // Function to check if the database connection is established
-  sendEmail, // Function to send an email on approved
-  rejectEmail, // Function to send an email on rejected
   generateAccount,
   getLatestTransferDate,
   convertEpochIntoDate
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
+
+const {
+  sendEmail, // Function to send an email on approved
+  rejectEmail, // Function to send an email on rejected
+} = require('../model/emails'); // Importing functions from the '../model/emails' module
 
 // Retrieve contract address from environment variable
 const rpcProvider = new ethers.JsonRpcProvider(process.env.RPC_ENDPOINT);

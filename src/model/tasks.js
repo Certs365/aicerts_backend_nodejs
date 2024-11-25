@@ -473,21 +473,6 @@ const convertEpochIntoDate = async (epochTimestamp) => {
     const dateString = `${month}/${day}/${year}`;
     return dateString;
   }
-}
-
-const convertExpirationStatusLog = async (_date) => {
-  if (_date == "1" || _date == null) {
-    return "1";
-  }
-  // Parse the date string into a Date object
-  const dateParts = (_date).split('/');
-  const year = parseInt(dateParts[4]) + 2000; // Assuming 4-digit year represents 2000s
-  const month = parseInt(dateParts[0]) - 1; // Months are zero-indexed
-  const day = parseInt(dateParts[1]);
-  // Create a Date object
-  const date = new Date(year, month, day);
-  // Format the date in ISO 8601 format with UTC offset
-  return date.toISOString();
 };
 
 // Verify Certification ID from both collections (single / batch)
@@ -1680,7 +1665,7 @@ const rejectEmail = async (name, email) => {
   try {
     // Update the mailOptions object with the recipient's email address and email body
     mailOptions.to = email;
-    mailOptions.subject = `Your Certs365 Account Registration Status`;
+    mailOptions.subject = `Your Certs365 Account is Rejected!`;
     mailOptions.html = `
 <html>
   <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; padding: 20px;">
@@ -1703,7 +1688,6 @@ const rejectEmail = async (name, email) => {
     </div>
   </body>
 </html>`;
-
     // Send the email using the configured transporter
     transporter.sendMail(mailOptions);
     console.log('Email sent successfully');
