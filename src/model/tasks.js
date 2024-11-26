@@ -18,6 +18,7 @@ const moment = require('moment');
 const { decryptData } = require("../common/cryptoFunction"); // Custom functions for cryptographic operations
 
 const cloudBucket = '.png';
+const limitThreshold = process.env.LIMIT_THRESHOLD;
 const retryDelay = parseInt(process.env.TIME_DELAY);
 const maxRetries = 3; // Maximum number of retries
 const schedule_days = parseInt(process.env.UPDATE_QUOTAS_DAYS) || 7;
