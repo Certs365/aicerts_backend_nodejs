@@ -38,6 +38,8 @@ var messageCode = require("../common/codes");
 const uploadsPath = path.join(__dirname, '../../uploads');
 
 const urlLimit = process.env.MAX_URL_SIZE || 50;
+const manualLimit = process.env.MANUAL_LIMIT || 100;
+const excelLimit = process.env.EXCEL_LIMIT || 1000;
 
 /**
  * Verify Certification page with PDF QR - Blockchain URL.
@@ -715,7 +717,9 @@ const verifyCertificationId = async (req, res) => {
 const verifyCustom = async (req, res) => {
   // Extracting file path from the request
   var file = req?.file.path;
-  console.log("file path", req.file.originalname);
+  var _manual = parseInt(req?.body.manual) || 0;
+  const manual = _manual == 0 ? 0 : 1;
+  console.log("file name with extension", req.file.originalname);
   // Extract the file extension
   const fileExtension = path.extname(req.file.originalname);
   let _columnIndex = parseInt(req.body.column) || 1;
@@ -730,9 +734,76 @@ const verifyCustom = async (req, res) => {
     '.pdf',
     '.xlx',
     '.xlsx',
-    '.csv', 
-    'json'
+    '.csv',
+    '.json'
   ];
+
+  if (fileExtension == acceptableFormats[4] && manual == 1) {
+    const fileContent = fs.readFileSync(file, 'utf8'); // Read the file synchronously
+    const jsonData = JSON.parse(fileContent); // Parse the JSON data
+    const verificationStatus = [
+      "invalid",
+      "valid",
+      'NA',
+      "revoked",
+    ];
+    if (!Array.isArray(jsonData)) {
+      res.status(400).json(verificationResponse);
+      console.error('JSON data is not an array.');
+      await wipeSourceFile(req.file.path);
+      return;
+    }
+    // Extract and log certificationID line by line
+    const certificationIDs = [];
+    const validCertStatus = [];
+    jsonData.forEach((item, index) => {
+      if (item.certificationID) {
+        certificationIDs.push(item.certificationID);
+      }
+    });
+
+    if (certificationIDs.length > 0 && certificationIDs.length > manualLimit) {
+      await wipeSourceFile(req.file.path);
+      return res.status(400).json({
+        code: 400,
+        status: "FAILED",
+        message: `${messageCode.msgExcelLimit}: ${manualLimit}`,
+        details: `Input Records : ${certificationIDs.length}`
+      });
+    }
+
+    for (const id of certificationIDs) {
+      const validStatus = await verificationWithDatabase(id);
+      validCertStatus.push(validStatus);
+    }
+
+    // Initialize counts array with zeros, same length as verificationStatus
+    const counts = new Array(verificationStatus.length).fill(0);
+    // Count occurrences
+    validCertStatus.forEach(index => {
+      counts[index]++;
+    });
+
+    if (validCertStatus.length > 0) {
+      // Map the data2 values to the corresponding verificationStatus based on the index
+      const mergedStatus = certificationIDs.map((id, index) => {
+        const statusIndex = validCertStatus[index]; // Convert to 0-based index
+        const status = verificationStatus[statusIndex] || "NA"; // Handle out-of-range indices
+        return { id, status };
+      });
+      await wipeSourceFile(req.file.path);
+      return res.status(200).json({
+        code: 200,
+        status: "SUCCESS",
+        message: messageCode.msgBatchVerification,
+        details: mergedStatus,
+        total: certificationIDs.length,
+        valid: counts[1],
+        invalid: counts[0],
+        revoked: counts[3]
+      });
+    }
+  }
 
   if (fileExtension != acceptableFormats[0] && fileExtension != acceptableFormats[1] && fileExtension != acceptableFormats[2] && fileExtension != acceptableFormats[3]) {
     await wipeSourceFile(req.file.path);
@@ -744,10 +815,6 @@ const verifyCustom = async (req, res) => {
   }
 
   try {
-
-    // Dynamically import fetch
-    const { default: fetch } = await import('node-fetch');
-
     if (fileExtension == acceptableFormats[0]) { // file has .pdf extension
 
       // const host = process.env.HOST;
@@ -909,6 +976,18 @@ const verifyCustom = async (req, res) => {
       const excelMessage = excelResponse?.message;
       const excelDetails = excelResponse?.Details;
       await wipeSourceFile(req.file.path);
+      if(statusCode == 200){
+        return res.status(statusCode).json({
+          code: statusCode,
+          status: excelStatus,
+          message: excelMessage,
+          details: excelDetails,
+          total: excelResponse?.total,
+          valid: excelResponse?.valid,
+          invalid: excelResponse?.invalid,
+          revoked: excelResponse?.revoked
+        });
+      } 
       return res.status(statusCode).json({
         code: statusCode,
         status: excelStatus,
@@ -923,6 +1002,18 @@ const verifyCustom = async (req, res) => {
       const csvMessage = csvResponse?.message;
       const csvDetails = csvResponse?.Details;
       await wipeSourceFile(req.file.path);
+      if(statusCode == 200){
+        return res.status(statusCode).json({
+          code: statusCode,
+          status: statusCode,
+          message: csvMessage,
+          details: csvDetails,
+          total: csvResponse?.total,
+          valid: csvResponse?.valid,
+          invalid: csvResponse?.invalid,
+          revoked: csvResponse?.revoked
+        });
+      } 
       return res.status(statusCode).json({
         code: statusCode,
         status: csvStatus,
@@ -1106,6 +1197,13 @@ const handleCustomBatchExcel = async (_path, _index) => {
         validCertStatus.push(validStatus);
       }
 
+      // Initialize counts array with zeros, same length as verificationStatus
+      const counts = new Array(verificationStatus.length).fill(0);
+      // Count occurrences
+      validCertStatus.forEach(index => {
+        counts[index]++;
+      });
+
       if (validCertStatus.length > 0) {
 
         // Map the data2 values to the corresponding verificationStatus based on the index
@@ -1120,7 +1218,11 @@ const handleCustomBatchExcel = async (_path, _index) => {
           status: "SUCCESS",
           response: true,
           message: messageCode.msgBatchVerification,
-          Details: mergedStatus
+          Details: mergedStatus,
+          total: notNullCertificationIDs.length,
+          valid: counts[1],
+          invalid: counts[0],
+          revoked: counts[3]
         };
 
       }
@@ -1222,6 +1324,13 @@ const handleCustomBatchCsv = async (_path, _index) => {
         validCertStatus.push(validStatus);
       }
 
+      // Initialize counts array with zeros, same length as verificationStatus
+      const counts = new Array(verificationStatus.length).fill(0);
+      // Count occurrences
+      validCertStatus.forEach(index => {
+        counts[index]++;
+      });
+
       if (validCertStatus.length > 0) {
 
         // Map the data2 values to the corresponding verificationStatus based on the index
@@ -1236,7 +1345,11 @@ const handleCustomBatchCsv = async (_path, _index) => {
           status: "SUCCESS",
           response: true,
           message: messageCode.msgBatchVerification,
-          Details: mergedStatus
+          Details: mergedStatus,
+          total: notNullCertificationIDs.length,
+          valid: counts[1],
+          invalid: counts[0],
+          revoked: counts[3]
         };
 
       }

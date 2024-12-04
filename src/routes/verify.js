@@ -132,6 +132,9 @@ router.post('/verify', _upload.single("pdfFile"), adminController.verify);
  *               column:
  *                 type: number
  *                 description: Specify the column position/index (if upload excel / CSV file) of desired credentials list (optional).
+ *               manual:
+ *                 type: number
+ *                 description: Manual value set to 1 (if upload JSON file) of desired credentials list (optional).
  *             required:
  *                - file
  *           example:

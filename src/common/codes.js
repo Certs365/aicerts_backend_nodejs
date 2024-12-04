@@ -17,7 +17,7 @@ module.exports = {
 
     // Handle Excel File messages
     msgInvalidExcel: "Invalid Excel file, Please try again",
-    msgExcelLimit: "Application can support issue credentials maximum ",
+    msgExcelLimit: "Application can support process credentials maximum ",
     msgInvalidCertIds: "Excel file has invalid credential IDs length (each: min 12 - max 25)",
     msgInvalidDocIds: "Input has invalid Document ID format (no special characters) / length (min 6 - max 50)",
     msgExcelRepetetionIds: "Excel file has repetition in credentail IDs",
@@ -242,5 +242,5 @@ module.exports = {
     msgInvalidBadge: "Not found / Badge code Invalid, Please try again with valid code...",
     msgBadgeDeleted: "Badge deleted successfully",
     msgBadgeNotDeleted: "Unable to delete the badge, Please try again with valid details...",
-
+    msgInvalidBatchJson: "Invalid JSON file data, Please check and try again",
 };
