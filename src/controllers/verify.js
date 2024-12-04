@@ -728,11 +728,13 @@ const verifyCustom = async (req, res) => {
 
   const acceptableFormats = [
     '.pdf',
+    '.xlx',
     '.xlsx',
-    '.csv'
+    '.csv', 
+    'json'
   ];
 
-  if (fileExtension != acceptableFormats[0] && fileExtension != acceptableFormats[1] && fileExtension != acceptableFormats[2]) {
+  if (fileExtension != acceptableFormats[0] && fileExtension != acceptableFormats[1] && fileExtension != acceptableFormats[2] && fileExtension != acceptableFormats[3]) {
     await wipeSourceFile(req.file.path);
     return res.status(400).json({
       code: 400,
@@ -899,7 +901,7 @@ const verifyCustom = async (req, res) => {
         return;
       }
 
-    } else if (fileExtension == acceptableFormats[1]) {
+    } else if (fileExtension == acceptableFormats[1] || fileExtension == acceptableFormats[2]) {
       const excelResponse = await handleCustomBatchExcel(req.file.path, columnIndex);
       console.log("Excel response: ", excelResponse);
       const statusCode = (excelResponse?.response) ? 200 : 400;
@@ -913,7 +915,7 @@ const verifyCustom = async (req, res) => {
         message: excelMessage,
         details: excelDetails
       });
-    } else if (fileExtension == acceptableFormats[2]) {
+    } else if (fileExtension == acceptableFormats[3]) {
       const csvResponse = await handleCustomBatchCsv(req.file.path, columnIndex);
       console.log("CSV response: ", csvResponse);
       const statusCode = (csvResponse?.response) ? 200 : 400;
