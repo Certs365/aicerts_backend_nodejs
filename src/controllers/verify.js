@@ -714,10 +714,10 @@ const verifyCertificationId = async (req, res) => {
  * @param {Object} req - Express request object.
  * @param {Object} res - Express response object.
  */
-const verifyCustom = async (req, res) => {
+const verifyBatch = async (req, res) => {
   // Extracting file path from the request
   var file = req?.file.path;
-  var _manual = parseInt(req?.body.manual) || 0;
+  var _manual = parseInt(req?.body.json) || 0;
   const manual = _manual == 0 ? 0 : 1;
   console.log("file name with extension", req.file.originalname);
   // Extract the file extension
@@ -1190,6 +1190,14 @@ const handleCustomBatchExcel = async (_path, _index) => {
       //   var validCertStatus = await verifySingleCertificationWithRetry(certId);
       //   validChainResponse.push(validCertStatus);
       // }
+      if (notNullCertificationIDs.length > excelLimit) {
+        return {
+          status: "FAILED",
+          response: false,
+          message: `${messageCode.msgExcelLimit}: ${excelLimit}`,
+          Details: `Input Records : ${notNullCertificationIDs.length}`,
+        };
+      }
 
       // Assuming Issues is your MongoDB model
       for (const id of notNullCertificationIDs) {
@@ -1318,6 +1326,16 @@ const handleCustomBatchCsv = async (_path, _index) => {
       //   validChainResponse.push(validCertStatus);
       // }
 
+      // Limit Records to certain limit in the Batch
+      if (notNullCertificationIDs.length > excelLimit) {
+        return {
+          status: "FAILED",
+          response: false,
+          message: `${messageCode.msgExcelLimit}: ${excelLimit}`,
+          Details: `Input Records : ${notNullCertificationIDs.length}`,
+        };
+      }
+
       // Assuming Issues is your MongoDB model
       for (const id of notNullCertificationIDs) {
         const validStatus = await verificationWithDatabase(id);
@@ -1382,7 +1400,7 @@ module.exports = {
   verify,
 
   // Function to verify Certification page with PDF QR / Zip / Excel
-  verifyCustom,
+  verifyBatch,
 
   // Function to verify a Single/Batch certification with an ID
   verifyCertificationId,

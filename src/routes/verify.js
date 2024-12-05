@@ -111,10 +111,10 @@ router.post('/verify', _upload.single("pdfFile"), adminController.verify);
 
 /**
  * @swagger
- * /api/verify-custom:
+ * /api/verify-batch:
  *   post:
- *     summary: Verify the Certification with QR / Excel / CSV  - Blockchain URL
- *     description: API Verify the Certification with QR / Excel / CSV - Blockchain URL. 
+ *     summary: Verify the Certification with QR / Excel / CSV / JSON - Blockchain URL
+ *     description: API Verify the Certification with QR / Excel / CSV / JSON - Blockchain URL. 
  *     tags: [Verification]
  *     security:
  *       - BearerAuth: []
@@ -132,9 +132,9 @@ router.post('/verify', _upload.single("pdfFile"), adminController.verify);
  *               column:
  *                 type: number
  *                 description: Specify the column position/index (if upload excel / CSV file) of desired credentials list (optional).
- *               manual:
+ *               json:
  *                 type: number
- *                 description: Manual value set to 1 (if upload JSON file) of desired credentials list (optional).
+ *                 description: Manually value set to 1 (if upload JSON file) of desired credentials list (optional).
  *             required:
  *                - file
  *           example:
@@ -186,7 +186,7 @@ router.post('/verify', _upload.single("pdfFile"), adminController.verify);
  *               message: Internal Server Error.
  */
 
-router.post('/verify-custom', upload.single("file"), adminController.verifyCustom);
+router.post('/verify-batch', upload.single("file"), adminController.verifyBatch);
 
 /**
  * @swagger
