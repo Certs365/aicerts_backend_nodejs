@@ -444,7 +444,7 @@ router.post('/issuance', validationRoute.issuance, ensureAuthenticated, adminCon
  *               message: The service is temporarily unavailable due to inactive/insufficient credits. Please try again later.
  */
 
-router.post('/issue-pdf', _upload.single("file"), ensureAuthenticated, adminController.issuePdf);
+router.post('/issue-pdf', _upload.single("file"), adminController.issuePdf);
 
 /**
  * @swagger
