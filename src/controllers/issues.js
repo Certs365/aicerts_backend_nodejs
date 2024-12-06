@@ -43,7 +43,9 @@ const uploadPath = path.join(__dirname, '../../uploads');
 const {
   isValidIssuer,
   connectToPolygon,
+  connectToStandby,
   connectToPolygonIssue,
+  connectToStandbyIssue,
   convertDateFormat,
   convertDateToEpoch,
   insertBatchCertificateData, // Function to insert Batch certificate data into the database
@@ -621,10 +623,10 @@ const Issuance = async (req, res) => {
  * @param {Object} res - Express response object.
  */
 const batchIssueCertificate = async (req, res) => {
-  const newContract = await connectToPolygon();
-  if (!newContract) {
-    return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
-  }
+  // const newContract = await connectToPolygon();
+  // if (!newContract) {
+  //   return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+  // }
   const email = req.body.email;
   var qrOption = 0;
   var file = req?.file;
@@ -710,6 +712,16 @@ const batchIssueCertificate = async (req, res) => {
         return;
 
       } else {
+        var newContract;
+        const blockchainPreference = (!idExist.blockchainPreference || idExist.blockchainPreference == 0) ? 0 : 1;
+        if (blockchainPreference == 0) {
+          newContract = await connectToPolygon();
+        } else {
+          newContract = await connectToStandby();
+        }
+        if (!newContract) {
+          return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+        }
 
         // Batch Certification Formated Details
         const rawBatchData = excelData.message[0];
@@ -779,7 +791,7 @@ const batchIssueCertificate = async (req, res) => {
           const tree = StandardMerkleTree.of(values, ['string']);
           let dateEntry;
 
-          const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1 ;
+          const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1;
           idExist.batchSequence = allocateBatchId;
 
           await idExist.save();
@@ -790,13 +802,19 @@ const batchIssueCertificate = async (req, res) => {
             dateEntry = 0;
           }
 
-          let { txHash, txFee } = await issueBatchCertificateWithRetry(tree.root, dateEntry);
+          let { txHash, txFee } = await issueBatchCertificateWithRetry(blockchainPreference, tree.root, dateEntry);
           if (!txHash) {
             await wipeSourceFile(req.file.path);
             return ({ code: 400, status: false, message: messageCode.msgFaileToIssueAfterRetry, details: certificateNumber });
           }
 
-          var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+          // var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+          var polygonLink;
+            if (blockchainPreference == 0) {
+              polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+            } else {
+              polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+            }
 
           try {
             // Check mongoose connection
@@ -2447,8 +2465,13 @@ const findDirectories = async (items, endFolder) => {
   return movedFiles;
 };
 
-const issueBatchCertificateWithRetry = async (root, expirationEpoch, retryCount = 3) => {
-  const newContract = await connectToPolygonIssue();
+const issueBatchCertificateWithRetry = async (blockchainPreference, root, expirationEpoch, retryCount = 3) => {
+  var newContract;
+  if (blockchainPreference == 0) {
+    newContract = await connectToPolygonIssue();
+  } else {
+    newContract = await connectToStandbyIssue();
+  }
   if (!newContract) {
     return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
   }
@@ -2466,7 +2489,7 @@ const issueBatchCertificateWithRetry = async (root, expirationEpoch, retryCount 
         console.log(`Unable to process the transaction. Retrying... Attempts left: ${retryCount}`);
         // Retry after a delay (e.g., 1.5 seconds)
         await holdExecution(1500);
-        return issueBatchCertificateWithRetry(root, expirationEpoch, retryCount - 1);
+        return issueBatchCertificateWithRetry(blockchainPreference, root, expirationEpoch, retryCount - 1);
       } else {
         return {
           txHash: null,
@@ -2485,7 +2508,7 @@ const issueBatchCertificateWithRetry = async (root, expirationEpoch, retryCount 
       console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);
       // Retry after a delay (e.g., 2 seconds)
       await holdExecution(2000);
-      return issueBatchCertificateWithRetry(root, expirationEpoch, retryCount - 1);
+      return issueBatchCertificateWithRetry(blockchainPreference, root, expirationEpoch, retryCount - 1);
     } else if (error.code === 'NONCE_EXPIRED') {
       // Extract and handle the error reason
       // console.log("Error reason:", error.reason);

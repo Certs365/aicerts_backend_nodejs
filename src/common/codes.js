@@ -243,4 +243,6 @@ module.exports = {
     msgBadgeDeleted: "Badge deleted successfully",
     msgBadgeNotDeleted: "Unable to delete the badge, Please try again with valid details...",
     msgInvalidBatchJson: "Invalid JSON file data, Please check and try again",
+    msgSetChainToPolygon: "Please set the Blockchain Option to Ploygon, to perform this operation",
+    msgSetChainToStandby: "Please set the Blockchain Option to Non-Polygon, to perform this operation",
 };
