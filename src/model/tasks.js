@@ -135,7 +135,11 @@ const isValidIssuer = async (email) => {
   }
   try {
     var validIssuer = await User.findOne({
-      email: email,
+      $expr: {
+        $and: [
+          { $eq: [{ $toLower: "$email" }, email.toLowerCase()] }
+        ]
+      },
       status: 1
     }).select('-password');
 

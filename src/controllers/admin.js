@@ -43,7 +43,13 @@ const signup = async (req, res) => {
     console.log(dbStatusMessage);
 
     // Checking if Admin already exists
-    const existingAdmin = await Admin.findOne({ email });
+    const existingAdmin = await Admin.findOne({
+      $expr: {
+        $and: [
+          { $eq: [{ $toLower: "$email" }, email.toLowerCase()] }
+        ]
+      }
+    });
 
     if (existingAdmin) {
       // Admin with the provided email already exists
@@ -109,6 +115,16 @@ const login = async (req, res) => {
     }
   });
 
+  if (!adminExist) {
+    // Admin with the provided email not exists
+    res.json({
+      code: 400,
+      status: "FAILED",
+      message: messageCode.msgInvalidCredentials,
+    });
+    return; // Stop execution if user not exists
+  }
+
   // Finding user by email
   await Admin.find({
     $expr: {
@@ -167,7 +183,7 @@ const login = async (req, res) => {
 
       } else {
         // User with provided email not found
-        res.json({
+        return res.json({
           code: 400,
           status: "FAILED",
           message: messageCode.msgInvalidCredentials,
@@ -176,7 +192,7 @@ const login = async (req, res) => {
     })
     .catch((err) => {
       // Error occurred during login process
-      res.json({
+      return res.json({
         code: 400,
         status: "FAILED",
         message: messageCode.msgErrorOnExistUser,
