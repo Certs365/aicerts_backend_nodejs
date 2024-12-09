@@ -27,11 +27,12 @@ const getOption = async (url, qrSide, code) => {
                 width: qrSide,
                 height: qrSide,
                 data: url,
+                image: logoUrl,
                 margin: 1,
                 qrOptions: {
                     typeNumber: "0",
                     mode: "Byte",
-                    errorCorrectionLevel: "H",
+                    errorCorrectionLevel: "Q",
                 },
                 dotsOptions: {
                     color: "#000000",
@@ -39,6 +40,10 @@ const getOption = async (url, qrSide, code) => {
                 },
                 backgroundOptions: {
                     color: "#ffffff",
+                },
+                imageOptions: {
+                    crossOrigin: "anonymous",
+                    margin: 0
                 },
                 cornersSquareOptions: {
                     color: "#000000",
@@ -55,11 +60,12 @@ const getOption = async (url, qrSide, code) => {
                 width: qrSide,
                 height: qrSide,
                 data: url,
+                image: logoUrl,
                 margin: 1,
                 qrOptions: {
                     typeNumber: "0",
                     mode: "Byte",
-                    errorCorrectionLevel: "H",
+                    errorCorrectionLevel: "Q",
                 },
                 dotsOptions: {
                     color: "#000000",
@@ -67,6 +73,10 @@ const getOption = async (url, qrSide, code) => {
                 },
                 backgroundOptions: {
                     color: "#ffffff",
+                },
+                imageOptions: {
+                    crossOrigin: "anonymous",
+                    margin: 0
                 },
                 cornersSquareOptions: {
                     color: "#000000",
@@ -83,6 +93,7 @@ const getOption = async (url, qrSide, code) => {
                 width: qrSide,
                 height: qrSide,
                 data: url,
+                image: logoUrl,
                 margin: 1,
                 qrOptions: {
                     typeNumber: "0",
@@ -96,6 +107,10 @@ const getOption = async (url, qrSide, code) => {
                 backgroundOptions: {
                     color: "#ffffff",
                 },
+                imageOptions: {
+                    crossOrigin: "anonymous",
+                    margin: 0
+                },
                 cornersSquareOptions: {
                     color: "#000000",
                     type: "extra-rounded",
@@ -106,12 +121,111 @@ const getOption = async (url, qrSide, code) => {
                 }
             };
             break;
+            case 4:
+                option = {
+                    width: qrSide,
+                    height: qrSide,
+                    data: url,
+                    image: logoUrl,
+                    margin: 1,
+                    qrOptions: {
+                        typeNumber: "0",
+                        mode: "Byte",
+                        errorCorrectionLevel: "Q",
+                    },
+                    dotsOptions: {
+                        color: "#000000",
+                        type: "square"
+                    },
+                    backgroundOptions: {
+                        color: "#ffffff",
+                    },
+                    imageOptions: {
+                        crossOrigin: "anonymous",
+                        margin: 0
+                    },
+                    cornersSquareOptions: {
+                        color: "#000000",
+                        type: "dot",
+                    },
+                    cornersDotOptions: {
+                        type: "dot",
+                        color: `#${themeColor}`,
+                    }
+                };
+            break;
+            case 5:
+            option = {
+                width: qrSide,
+                height: qrSide,
+                data: url,
+                image: logoUrl,
+                margin: 1,
+                qrOptions: {
+                    typeNumber: "0",
+                    mode: "Byte",
+                    errorCorrectionLevel: "Q",
+                },
+                dotsOptions: {
+                    color: "#000000",
+                    type: "dots"
+                },
+                backgroundOptions: {
+                    color: "#ffffff",
+                },
+                imageOptions: {
+                    crossOrigin: "anonymous",
+                    margin: 0
+                },
+                cornersSquareOptions: {
+                    color: "#000000",
+                    type: "dot",
+                },
+                cornersDotOptions: {
+                    type: "dot",
+                    color: `#${themeColor}`,
+                }
+            };
+            break;
+            case 6:
+            option = {
+                width: qrSide,
+                height: qrSide,
+                data: url,
+                image: logoUrl,
+                margin: 1,
+                qrOptions: {
+                    typeNumber: "0",
+                    mode: "Byte",
+                    errorCorrectionLevel: "Q",
+                },
+                dotsOptions: {
+                    color: "#000000",
+                    type: "extra-rounded"
+                },
+                backgroundOptions: {
+                    color: "#ffffff",
+                },
+                imageOptions: {
+                    crossOrigin: "anonymous",
+                    margin: 0
+                },
+                cornersSquareOptions: {
+                    color: "#000000",
+                    type: "dot",
+                },
+                cornersDotOptions: {
+                    type: "square",
+                    color: `#${themeColor}`,
+                }
+            };
+            break;
         default:
             option = {
                 width: qrSide,
                 height: qrSide,
                 data: url,
-                // image: logoUrl,
+                image: logoUrl,
                 qrOptions: {
                     typeNumber: "0",
                     mode: "Byte",
@@ -124,10 +238,10 @@ const getOption = async (url, qrSide, code) => {
                 backgroundOptions: {
                     color: "#ffffff",
                 },
-                // imageOptions: {
-                //     crossOrigin: "anonymous",
-                //     margin: 0
-                // },
+                imageOptions: {
+                    crossOrigin: "anonymous",
+                    margin: 0
+                },
                 cornersSquareOptions: {
                     color: "#000000",
                     type: "extra-rounded",
