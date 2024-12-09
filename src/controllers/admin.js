@@ -28,56 +28,56 @@ var messageCode = require("../common/codes");
 const signup = async (req, res) => {
   var validResult = validationResult(req);
   if (!validResult.isEmpty()) {
-    return res.status(422).json({ code: 422, status: "FAILED", message: messageCode.msgEnterInvalid ,details: validResult.array() });
+    return res.status(422).json({ code: 422, status: "FAILED", message: messageCode.msgEnterInvalid, details: validResult.array() });
   }
   // Extracting name, email, and password from the request body
   let { name, email, password } = req.body;
   name = name.trim();
-  email = email.trim();
+  email = email.toLowerCase();
   password = password.trim();
 
-    try {
-      // Check mongoose connection
-      const dbStatus = await isDBConnected();
-      const dbStatusMessage = (dbStatus == true) ? messageCode.msgDbReady : messageCode.msgDbNotReady;
-      console.log(dbStatusMessage);
+  try {
+    // Check mongoose connection
+    const dbStatus = await isDBConnected();
+    const dbStatusMessage = (dbStatus == true) ? messageCode.msgDbReady : messageCode.msgDbNotReady;
+    console.log(dbStatusMessage);
 
-      // Checking if Admin already exists
-      const existingAdmin = await Admin.findOne({ email });
+    // Checking if Admin already exists
+    const existingAdmin = await Admin.findOne({ email });
 
-      if (existingAdmin) {
-        // Admin with the provided email already exists
-        res.json({
-          code: 400, 
-          status: "FAILED",
-          message: messageCode.msgAdminMailExist,
-        });
-        return; // Stop execution if user already exists
-      }
-
-      // password handling
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
-
-      // Save new user
-      const newAdmin = new Admin({
-        name,
-        email,
-        password: hashedPassword,
-        status: false
-      });
-
-      const savedAdmin = await newAdmin.save();
+    if (existingAdmin) {
+      // Admin with the provided email already exists
       res.json({
-        code: 200, 
-        status: "SUCCESS",
-        message: messageCode.msgSignupSuccess,
-        data: savedAdmin,
+        code: 400,
+        status: "FAILED",
+        message: messageCode.msgAdminMailExist,
       });
-    } catch (error) {
-      // An error occurred during signup process
-      return res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
+      return; // Stop execution if user already exists
     }
+
+    // password handling
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Save new user
+    const newAdmin = new Admin({
+      name,
+      email,
+      password: hashedPassword,
+      status: false
+    });
+
+    const savedAdmin = await newAdmin.save();
+    res.json({
+      code: 200,
+      status: "SUCCESS",
+      message: messageCode.msgSignupSuccess,
+      data: savedAdmin,
+    });
+  } catch (error) {
+    // An error occurred during signup process
+    return res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
+  }
 
 };
 
@@ -90,86 +90,98 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
   var validResult = validationResult(req);
   if (!validResult.isEmpty()) {
-    return res.status(422).json({ code: 422, status: "FAILED", message: messageCode.msgEnterInvalid ,details: validResult.array() });
+    return res.status(422).json({ code: 422, status: "FAILED", message: messageCode.msgEnterInvalid, details: validResult.array() });
   }
   let { email, password } = req.body;
 
-    // Check database connection
-    const dbStatus = await isDBConnected();
-    const dbStatusMessage = (dbStatus == true) ? messageCode.msgDbReady : messageCode.msgDbNotReady;
-    console.log(dbStatusMessage);
+  // Check database connection
+  const dbStatus = await isDBConnected();
+  const dbStatusMessage = (dbStatus == true) ? messageCode.msgDbReady : messageCode.msgDbNotReady;
+  console.log(dbStatusMessage);
 
-    // Checking if user exists 
-    const adminExist = await Admin.findOne({ email });
+  // Checking if user exists 
+  // const adminExist = await Admin.findOne({ email });
+  const adminExist = await Admin.findOne({
+    $expr: {
+      $and: [
+        { $eq: [{ $toLower: "$email" }, email.toLowerCase()] }
+      ]
+    }
+  });
 
-    // Finding user by email
-    Admin.find({ email })
-      .then((data) => {
-        if (data.length) {
+  // Finding user by email
+  await Admin.find({
+    $expr: {
+      $and: [
+        { $eq: [{ $toLower: "$email" }, email.toLowerCase()] }
+      ]
+    }
+  })
+    .then((data) => {
+      if (data.length) {
+        // User exists
+        const hashedPassword = data[0].password;
+        // Compare password hashes
+        bcrypt
+          .compare(password, hashedPassword)
+          .then((result) => {
+            if (result) {
+              // Password match
+              // Update admin status to true
+              adminExist.status = true;
+              adminExist.save();
 
-          // User exists
-          const hashedPassword = data[0].password;
-          // Compare password hashes
-          bcrypt
-            .compare(password, hashedPassword)
-            .then((result) => {
-              if (result) {
-                // Password match
-                // Update admin status to true
-                adminExist.status = true;
-                adminExist.save();
+              // Generate JWT token for authentication
+              const JWTToken = generateJwtToken();
 
-                // Generate JWT token for authentication
-                const JWTToken = generateJwtToken();
-
-                // Respond with success message and user details
-                res.status(200).json({
-                  code: 200, 
-                  status: "SUCCESS",
-                  message: messageCode.msgValidCredentials,
-                  data: {
-                    JWTToken: JWTToken,
-                    _id:data[0]?.issuerId,
-                    name: data[0]?.name,
-                    organization: data[0]?.organization,
-                    email: data[0]?.email
-                  }
-                });
-              } else {
-                // Incorrect password
-                res.json({
-                  code: 401, 
-                  status: "FAILED",
-                  message: messageCode.msgInvalidPassword,
-                });
-              }
-            })
-            .catch((err) => {
-              // Error occurred while comparing passwords
-              res.json({
-                code: 401, 
-                status: "FAILED",
-                message: messageCode.msgErrorOnPwdCompare,
+              // Respond with success message and user details
+              res.status(200).json({
+                code: 200,
+                status: "SUCCESS",
+                message: messageCode.msgValidCredentials,
+                data: {
+                  JWTToken: JWTToken,
+                  _id: data[0]?.issuerId,
+                  name: data[0]?.name,
+                  organization: data[0]?.organization,
+                  email: data[0]?.email
+                }
               });
+            } else {
+              // Incorrect password
+              res.json({
+                code: 401,
+                status: "FAILED",
+                message: messageCode.msgInvalidPassword,
+              });
+            }
+          })
+          .catch((err) => {
+            // Error occurred while comparing passwords
+            res.json({
+              code: 401,
+              status: "FAILED",
+              message: messageCode.msgErrorOnPwdCompare,
             });
-
-        } else {
-          // User with provided email not found
-          res.json({
-            code: 400, 
-            status: "FAILED",
-            message: messageCode.msgInvalidCredentials,
           });
-        }
-      })
-      .catch((err) => {
-        // Error occurred during login process
+
+      } else {
+        // User with provided email not found
         res.json({
-          code: 400, 
+          code: 400,
           status: "FAILED",
-          message: messageCode.msgErrorOnExistUser,
+          message: messageCode.msgInvalidCredentials,
         });
+      }
+    })
+    .catch((err) => {
+      // Error occurred during login process
+      res.json({
+        code: 400,
+        status: "FAILED",
+        message: messageCode.msgErrorOnExistUser,
       });
+    });
 };
 
 /**
@@ -181,7 +193,7 @@ const login = async (req, res) => {
 const logout = async (req, res) => {
   var validResult = validationResult(req);
   if (!validResult.isEmpty()) {
-    return res.status(422).json({ code: 422, status: "FAILED", message: messageCode.msgEnterInvalid ,details: validResult.array() });
+    return res.status(422).json({ code: 422, status: "FAILED", message: messageCode.msgEnterInvalid, details: validResult.array() });
   }
   let { email } = req.body;
   try {
@@ -196,7 +208,7 @@ const logout = async (req, res) => {
     // If admin doesn't exist, or if they are not logged in, return failure response
     if (!existingAdmin) {
       return res.json({
-        code: 400, 
+        code: 400,
         status: 'FAILED',
         message: messageCode.msgAdminNotFound,
       });
@@ -209,7 +221,7 @@ const logout = async (req, res) => {
 
     // Respond with success message upon successful logout
     res.json({
-      code: 200, 
+      code: 200,
       status: "SUCCESS",
       message: messageCode.msgLogoutSuccess
     });
@@ -217,7 +229,7 @@ const logout = async (req, res) => {
   } catch (error) {
     // Error occurred during logout process, respond with failure message
     res.json({
-      code: 400, 
+      code: 400,
       status: 'FAILED',
       message: messageCode.msgErrorInLogout
     });
@@ -233,7 +245,7 @@ const logout = async (req, res) => {
 const resetPassword = async (req, res) => {
   var validResult = validationResult(req);
   if (!validResult.isEmpty()) {
-    return res.status(422).json({ code: 422, status: "FAILED", message: messageCode.msgEnterInvalid ,details: validResult.array() });
+    return res.status(422).json({ code: 422, status: "FAILED", message: messageCode.msgEnterInvalid, details: validResult.array() });
   }
   let { email, password } = req.body;
   try {
@@ -248,7 +260,7 @@ const resetPassword = async (req, res) => {
     // If admin doesn't exist, return failure response
     if (!admin) {
       return res.json({
-        code: 400, 
+        code: 400,
         status: 'FAILED',
         message: messageCode.msgAdminNotFound,
       });
@@ -258,7 +270,7 @@ const resetPassword = async (req, res) => {
     const isSamePassword = await bcrypt.compare(password, admin.password);
     if (isSamePassword) {
       return res.json({
-        code: 400, 
+        code: 400,
         status: 'FAILED',
         message: messageCode.msgPwdNotSame
       });
@@ -277,7 +289,7 @@ const resetPassword = async (req, res) => {
           .then(() => {
             // Password reset successful, respond with success message
             res.json({
-              code: 200, 
+              code: 200,
               status: "SUCCESS",
               message: messageCode.msgPwdSuccess
             });
@@ -285,7 +297,7 @@ const resetPassword = async (req, res) => {
           .catch((err) => {
             // Error occurred while saving user account, respond with failure message
             res.json({
-              code: 400, 
+              code: 400,
               status: "FAILED",
               message: messageCode.msgErrorOnUser
             });
@@ -294,7 +306,7 @@ const resetPassword = async (req, res) => {
       .catch((err) => {
         // Error occurred while hashing password, respond with failure message
         res.json({
-          code: 400, 
+          code: 400,
           status: "FAILED",
           message: messageCode.msgErrorOnHashing
         });
@@ -303,7 +315,7 @@ const resetPassword = async (req, res) => {
   } catch (error) {
     // Error occurred during password reset process, respond with failure message
     res.json({
-      code: 400, 
+      code: 400,
       status: 'FAILED',
       message: messageCode.msgErrorOnPwdReset
     });

@@ -134,7 +134,6 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
             // Blockchain calls
             const getCertificateStatus = await newContract.getCertificateStatus(certificateNumber);
                 
-
             try {
 
                 let certStatus = parseInt(getCertificateStatus);
