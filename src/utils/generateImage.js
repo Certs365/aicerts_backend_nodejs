@@ -27,7 +27,7 @@ const getOption = async (url, qrSide, code) => {
                 width: qrSide,
                 height: qrSide,
                 data: url,
-                image: logoUrl,
+                // image: logoUrl,
                 margin: 1,
                 qrOptions: {
                     typeNumber: "0",
@@ -93,7 +93,7 @@ const getOption = async (url, qrSide, code) => {
                 width: qrSide,
                 height: qrSide,
                 data: url,
-                image: logoUrl,
+                // image: logoUrl,
                 margin: 1,
                 qrOptions: {
                     typeNumber: "0",
@@ -159,7 +159,7 @@ const getOption = async (url, qrSide, code) => {
                 width: qrSide,
                 height: qrSide,
                 data: url,
-                image: logoUrl,
+                // image: logoUrl,
                 margin: 1,
                 qrOptions: {
                     typeNumber: "0",
@@ -192,7 +192,7 @@ const getOption = async (url, qrSide, code) => {
                 width: qrSide,
                 height: qrSide,
                 data: url,
-                image: logoUrl,
+                // image: logoUrl,
                 margin: 1,
                 qrOptions: {
                     typeNumber: "0",
