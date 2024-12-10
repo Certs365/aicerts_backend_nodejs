@@ -818,7 +818,6 @@ const verifyBatch = async (req, res) => {
   try {
     if (fileExtension == acceptableFormats[0]) { // file has .pdf extension
 
-      // const host = process.env.HOST;
       // const port = process.env.PORT;
       // const hostUrl = `${host}:${port}/`;
 
