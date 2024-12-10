@@ -108,6 +108,8 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
             return ({ code: 400, status: "FAILED", message: errorMessage });
         }
 
+        const blockchainPreference = (!idExist.blockchainPreference || idExist.blockchainPreference == 0) ? 0 : 1;
+
         if (isNumberExist) {
             if (isNumberExist.expirationDate == "1") {
                 return ({ code: 400, status: "FAILED", message: messageCode.msgUpdateExpirationNotPossible });
@@ -119,8 +121,17 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
             }
 
             var newContract;
-            const blockchainPreference = (!idExist.blockchainPreference || idExist.blockchainPreference == 0) ? 0 : 1;
-            if (blockchainPreference == 0) {
+            var blockchainOption = (!isNumberExist.blockchainOption || isNumberExist.blockchainOption == 0) ? 0 : 1;
+
+            if (blockchainPreference != blockchainOption) {
+                if (blockchainPreference == 0) {
+                    return { code: 400, status: "FAILED", message: messageCode.msgSetChainToStandby };
+                } else {
+                    return { code: 400, status: "FAILED", message: messageCode.msgSetChainToPolygon };
+                }
+            }
+
+            if (blockchainOption == 0) {
                 newContract = await connectToPolygon();
                 if (!newContract) {
                     return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
@@ -131,9 +142,10 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
                     return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
                 }
             }
+
             // Blockchain calls
             const getCertificateStatus = await newContract.getCertificateStatus(certificateNumber);
-                
+
             try {
 
                 let certStatus = parseInt(getCertificateStatus);
@@ -191,12 +203,17 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
 
                     if (verifyOnChain[0] === true) {
 
-                        var { txHash, txFee } = await renewSingleCertificateExpirationWithRetry(certificateNumber, combinedHash, epochExpiration);
+                        var { txHash, txFee } = await renewSingleCertificateExpirationWithRetry(blockchainOption, certificateNumber, combinedHash, epochExpiration);
                         if (!txHash) {
                             return ({ code: 400, status: false, message: messageCode.msgFailedToRenewRetry, details: epochExpiration });
                         }
 
-                        var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                        var polygonLink;
+                        if (blockchainOption == 0) {
+                            polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                        } else {
+                            polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+                        }
 
                         // Generate encrypted URL with certificate data
                         const dataWithLink = { ...fields, polygonLink: polygonLink }
@@ -275,7 +292,8 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
                             expirationDate: expirationDate,
                             type: isNumberExist.type,
                             email: email,
-                            certStatus: 2
+                            certStatus: 2,
+                            blockchainOption: blockchainPreference
                         };
                         // Insert certification status data into database
                         await insertIssueStatus(certificateData);
@@ -312,6 +330,28 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
             if (isNumberExistInBatch.expirationDate == "1") {
                 return ({ code: 400, status: "FAILED", message: messageCode.msgUpdateExpirationNotPossible });
             }
+            var newContract;
+            var blockchainOption = (!isNumberExistInBatch.blockchainOption || isNumberExistInBatch.blockchainOption == 0) ? 0 : 1;
+
+            if (blockchainPreference != blockchainOption) {
+                if (blockchainPreference == 0) {
+                    return { code: 400, status: "FAILED", message: messageCode.msgSetChainToStandby };
+                } else {
+                    return { code: 400, status: "FAILED", message: messageCode.msgSetChainToPolygon };
+                }
+            }
+
+            if (blockchainOption == 0) {
+                newContract = await connectToPolygon();
+                if (!newContract) {
+                    return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                }
+            } else {
+                newContract = await connectToStandby();
+                if (!newContract) {
+                    return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                }
+            }
 
             try {
                 //blockchain calls
@@ -337,6 +377,29 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
                     if (certDateValidation == 0 || certDateValidation == 2) {
                         // Respond with error message
                         return ({ code: 400, status: "FAILED", message: `${messageCode.msgEpirationMustGreater}: ${isNumberExistInBatch.expirationDate}` });
+                    }
+                }
+
+                var newContract;
+                var blockchainOption = (!isNumberExistInBatch.blockchainOption || isNumberExistInBatch.blockchainOption == 0) ? 0 : 1;
+
+                if (blockchainPreference != blockchainOption) {
+                    if (blockchainPreference == 0) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgSetChainToStandby };
+                    } else {
+                        return { code: 400, status: "FAILED", message: messageCode.msgSetChainToPolygon };
+                    }
+                }
+
+                if (blockchainOption == 0) {
+                    newContract = await connectToPolygon();
+                    if (!newContract) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                    }
+                } else {
+                    newContract = await connectToStandby();
+                    if (!newContract) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
                     }
                 }
 
@@ -396,12 +459,17 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
 
                         if (verifyOnChain[0] === false) {
 
-                            var { txHash, txFee } = await renewCertificateExpirationInBatchWithRetry(fetchIndex, hashedProof, epochExpiration);
+                            var { txHash, txFee } = await renewCertificateExpirationInBatchWithRetry(blockchainOption, fetchIndex, hashedProof, epochExpiration);
                             if (!txHash) {
                                 return ({ code: 400, status: false, message: messageCode.msgFailedToRenewRetry, details: epochExpiration });
                             }
 
-                            var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                            var polygonLink;
+                            if (blockchainOption == 0) {
+                                polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                            } else {
+                                polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+                            }
 
                             // Generate encrypted URL with certificate data
 
@@ -481,7 +549,8 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
                                 name: isNumberExistInBatch.name,
                                 expirationDate: fields.Expiration_Date,
                                 email: email,
-                                certStatus: 2
+                                certStatus: 2,
+                                blockchainOption: blockchainPreference
                             };
                             // Insert certification status data into database
                             await insertIssueStatus(certificateData);
@@ -534,10 +603,10 @@ const handleRenewCertification = async (email, certificateNumber, _expirationDat
 };
 
 const handleUpdateCertificationStatus = async (email, certificateNumber, certStatus) => {
-    const newContract = await connectToPolygon();
-    if (!newContract) {
-        return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
-    }
+    // const newContract = await connectToPolygon();
+    // if (!newContract) {
+    //     return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+    // }
     // Get today's date
     const today = new Date().toLocaleString("en-US", { timeZone: "America/New_York" }); // Adjust timeZone as per the US Standard Time zone
     // Convert today's date to epoch time (in milliseconds)
@@ -568,26 +637,9 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
             return ({ code: 400, status: "FAILED", message: errorMessage });
         }
         var _certStatus = await getCertificationStatus(certStatus);
+        const blockchainPreference = (!isIssuerExist.blockchainPreference || isIssuerExist.blockchainPreference == 0) ? 0 : 1;
 
         try {
-            // Verify certificate on blockchain
-            const isPaused = await newContract.paused();
-            const issuerAuthorized = await newContract.hasRole(process.env.ISSUER_ROLE, isIssuerExist.issuerId);
-
-            if (
-                issuerAuthorized === false ||
-                isPaused === true
-            ) {
-                // Issuer not authorized / contract paused
-                let messageContent = "";
-                if (isPaused === true) {
-                    messageContent = messageCode.msgOpsRestricted;
-                } else if (issuerAuthorized === false) {
-                    messageContent = messageCode.msgIssuerUnauthrized;
-                }
-                return ({ code: 400, status: "FAILED", message: messageContent });
-            }
-
             if (isNumberExist) {
                 if (isNumberExist.certificateStatus != 3 && certStatus == 4) {
                     return ({ code: 400, status: "FAILED", message: messageCode.msgReactivationNotPossible });
@@ -595,6 +647,29 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
 
                 if (isNumberExist.certificateStatus == parseInt(certStatus)) {
                     return ({ code: 400, status: "FAILED", message: messageCode.msgStatusAlreadyExist });
+                }
+
+                var blockchainOption = (!isNumberExist.blockchainOption || isNumberExist.blockchainOption == 0) ? 0 : 1;
+
+                if (blockchainPreference != blockchainOption) {
+                    if (blockchainPreference == 0) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgSetChainToStandby };
+                    } else {
+                        return { code: 400, status: "FAILED", message: messageCode.msgSetChainToPolygon };
+                    }
+                }
+
+                var newContract;
+                if (blockchainOption == 0) {
+                    newContract = await connectToPolygon();
+                    if (!newContract) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                    }
+                } else {
+                    newContract = await connectToStandby();
+                    if (!newContract) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                    }
                 }
 
                 try {
@@ -615,12 +690,17 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                     }
                     if (getCertificateStatus != certStatus) {
 
-                        let { txHash, txFee } = await updateSingleCertificateStatusWithRetry(certificateNumber, certStatus);
+                        let { txHash, txFee } = await updateSingleCertificateStatusWithRetry(blockchainOption, certificateNumber, certStatus);
                         if (!txHash) {
                             return ({ code: 400, status: false, message: messageCode.msgFailedToUpdateStatusRetry, details: certificateNumber });
                         }
 
-                        var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                        var polygonLink;
+                        if (blockchainOption == 0) {
+                            polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                        } else {
+                            polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+                        }
 
                         // Save Issue details (modified)
                         isNumberExist.certificateStatus = certStatus;
@@ -641,7 +721,8 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                             name: isNumberExist.name,
                             expirationDate: isNumberExist.expirationDate,
                             email: email,
-                            certStatus: certStatus
+                            certStatus: certStatus,
+                            blockchainOption
                         };
 
                         // Insert certification status data into database
@@ -671,6 +752,29 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                     return ({ code: 400, status: "FAILED", message: messageCode.msgReactivationNotPossible });
                 }
 
+                var blockchainOption = (!isNumberExistInBatch.blockchainOption || isNumberExistInBatch.blockchainOption == 0) ? 0 : 1;
+
+                if (blockchainPreference != blockchainOption) {
+                    if (blockchainPreference == 0) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgSetChainToStandby };
+                    } else {
+                        return { code: 400, status: "FAILED", message: messageCode.msgSetChainToPolygon };
+                    }
+                }
+
+                var newContract;
+                if (blockchainOption == 0) {
+                    newContract = await connectToPolygon();
+                    if (!newContract) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                    }
+                } else {
+                    newContract = await connectToStandby();
+                    if (!newContract) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                    }
+                }
+
                 try {
                     // let fetchIndex = isNumberExistInBatch.batchId - 1;
                     let hashedProof = isNumberExistInBatch.encodedProof;
@@ -682,12 +786,17 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                         return ({ code: 400, status: "FAILED", message: messageCode.msgStatusAlreadyExist });
                     }
 
-                    let { txHash, txFee } = await updateCertificateStatusInBatchWithRetry(hashedProof, certStatus);
+                    let { txHash, txFee } = await updateCertificateStatusInBatchWithRetry(blockchainOption, hashedProof, certStatus);
                     if (!txHash) {
                         return ({ code: 400, status: false, message: messageCode.msgFailedToUpdateStatusRetry, details: certStatus });
                     }
 
-                    let polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                    var polygonLink;
+                    if (blockchainOption == 0) {
+                        polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                    } else {
+                        polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+                    }
 
                     // Save updated details (modified)
                     isNumberExistInBatch.certificateStatus = certStatus;
@@ -701,7 +810,6 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                     isIssuerExist.transactionFee = previousrtransactionFee + txFee;
                     await isIssuerExist.save(); // Save the changes to the existing user
 
-
                     var certificateData = {
                         issuerId: isIssuerExist.issuerId,
                         batchId: isNumberExistInBatch.batchId,
@@ -711,7 +819,8 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                         name: isNumberExistInBatch.name,
                         expirationDate: isNumberExistInBatch.expirationDate,
                         email: email,
-                        certStatus: certStatus
+                        certStatus: certStatus,
+                        blockchainOption
                     };
 
                     // Insert certification status data into database
@@ -738,6 +847,29 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                     return ({ code: 400, status: "FAILED", message: messageCode.msgStatusAlreadyExist });
                 }
 
+                var blockchainOption = (!isNumberExistInSingleDynamic.blockchainOption || isNumberExistInSingleDynamic.blockchainOption == 0) ? 0 : 1;
+
+                if (blockchainPreference != blockchainOption) {
+                    if (blockchainPreference == 0) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgSetChainToStandby };
+                    } else {
+                        return { code: 400, status: "FAILED", message: messageCode.msgSetChainToPolygon };
+                    }
+                }
+
+                var newContract;
+                if (blockchainOption == 0) {
+                    newContract = await connectToPolygon();
+                    if (!newContract) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                    }
+                } else {
+                    newContract = await connectToStandby();
+                    if (!newContract) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                    }
+                }
+
                 try {
                     let _getCertificateStatus = await newContract.getCertificateStatus(certificateNumber);
                     const getCertificateStatus = parseInt(_getCertificateStatus);
@@ -746,12 +878,17 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                     }
                     if (getCertificateStatus != certStatus) {
 
-                        let { txHash, txFee } = await updateSingleCertificateStatusWithRetry(certificateNumber, certStatus);
+                        let { txHash, txFee } = await updateSingleCertificateStatusWithRetry(blockchainOption, certificateNumber, certStatus);
                         if (!txHash) {
                             return ({ code: 400, status: false, message: messageCode.msgFailedToUpdateStatusRetry, details: certificateNumber });
                         }
 
-                        var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                        var polygonLink;
+                        if (blockchainOption == 0) {
+                            polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                        } else {
+                            polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+                        }
 
                         // Save Issue details (modified)
                         isNumberExistInSingleDynamic.certificateStatus = certStatus;
@@ -772,7 +909,8 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                             name: isNumberExistInSingleDynamic.name,
                             expirationDate: 0,
                             email: email,
-                            certStatus: certStatus
+                            certStatus: certStatus,
+                            blockchainOption
                         };
 
                         // Insert certification status data into database
@@ -798,6 +936,29 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                     return ({ code: 400, status: "FAILED", message: messageCode.msgStatusAlreadyExist });
                 }
 
+                var blockchainOption = (!isNumberExist.blockchainOption || isNumberExist.blockchainOption == 0) ? 0 : 1;
+
+                if (blockchainPreference != blockchainOption) {
+                    if (blockchainPreference == 0) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgSetChainToStandby };
+                    } else {
+                        return { code: 400, status: "FAILED", message: messageCode.msgSetChainToPolygon };
+                    }
+                }
+
+                var newContract;
+                if (blockchainOption == 0) {
+                    newContract = await connectToPolygon();
+                    if (!newContract) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                    }
+                } else {
+                    newContract = await connectToStandby();
+                    if (!newContract) {
+                        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+                    }
+                }
+
                 try {
                     // let fetchIndex = isNumberExistInBatchDynamic.batchId - 1;
                     let hashedProof = isNumberExistInBatchDynamic.encodedProof;
@@ -809,12 +970,17 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                         return ({ code: 400, status: "FAILED", message: messageCode.msgStatusAlreadyExist });
                     }
 
-                    let { txHash, txFee } = await updateCertificateStatusInBatchWithRetry(hashedProof, certStatus);
+                    let { txHash, txFee } = await updateCertificateStatusInBatchWithRetry(blockchainOption, hashedProof, certStatus);
                     if (!txHash) {
                         return ({ code: 400, status: false, message: messageCode.msgFailedToUpdateStatusRetry, details: certStatus });
                     }
 
-                    let polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                    var polygonLink;
+                    if (blockchainOption == 0) {
+                        polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+                    } else {
+                        polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+                    }
 
                     // Save updated details (modified)
                     isNumberExistInBatchDynamic.certificateStatus = certStatus;
@@ -838,7 +1004,8 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                         name: isNumberExistInBatchDynamic.name,
                         expirationDate: 0,
                         email: email,
-                        certStatus: certStatus
+                        certStatus: certStatus,
+                        blockchainOption
                     };
 
                     // Insert certification status data into database
@@ -1079,10 +1246,15 @@ const expirationDateVariaton = async (_oldExpirationDate, _newExpirationDate) =>
 };
 
 // Function to Perform Extend expiration of Single Certificate with retry mechanism 
-const renewSingleCertificateExpirationWithRetry = async (certificateNumber, combinedHash, epochExpiration, retryCount = 3) => {
-    const newContract = await connectToPolygonIssue();
+const renewSingleCertificateExpirationWithRetry = async (blockchainPreference, certificateNumber, combinedHash, epochExpiration, retryCount = 3) => {
+    var newContract;
+    if (blockchainPreference == 0) {
+        newContract = await connectToPolygonIssue();
+    } else {
+        newContract = await connectToStandbyIssue();
+    }
     if (!newContract) {
-        return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
     }
     // Perform Extend expiration of Single Certificate with retry mechanism
     try {
@@ -1100,7 +1272,7 @@ const renewSingleCertificateExpirationWithRetry = async (certificateNumber, comb
                 console.log(`Unable to process the transaction. Retrying... Attempts left: ${retryCount}`);
                 // Retry after a delay (e.g., 1.5 seconds)
                 await holdExecution(1500);
-                return renewSingleCertificateExpirationWithRetry(certificateNumber, combinedHash, epochExpiration, retryCount - 1);
+                return renewSingleCertificateExpirationWithRetry(blockchainPreference, certificateNumber, combinedHash, epochExpiration, retryCount - 1);
             }
         }
 
@@ -1114,24 +1286,24 @@ const renewSingleCertificateExpirationWithRetry = async (certificateNumber, comb
             console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);
             // Retry after a delay (e.g., 2 seconds)
             await holdExecution(2000);
-            return renewSingleCertificateExpirationWithRetry(certificateNumber, combinedHash, epochExpiration, retryCount - 1);
+            return renewSingleCertificateExpirationWithRetry(blockchainPreference, certificateNumber, combinedHash, epochExpiration, retryCount - 1);
         } else if (error.code === 'NONCE_EXPIRED') {
             // Extract and handle the error reason
-            // console.log("Error reason:", error.reason);
+            console.error("Error reason:", error.reason);
             return {
                 txHash: null,
                 txFee: null
             };
         } else if (error.reason) {
             // Extract and handle the error reason
-            // console.log("Error reason:", error.reason);
+            console.error("Error reason:", error.reason);
             return {
                 txHash: null,
                 txFee: null
             };
         } else {
             // If there's no specific reason provided, handle the error generally
-            // console.error(messageCode.msgFailedOpsAtBlockchain, error);
+            console.error(messageCode.msgFailedOpsAtBlockchain, error);
             return {
                 txHash: null,
                 txFee: null
@@ -1141,10 +1313,15 @@ const renewSingleCertificateExpirationWithRetry = async (certificateNumber, comb
 };
 
 // Function to Perform Extend expiration of Certificate in the batch with retry mechanism 
-const renewCertificateExpirationInBatchWithRetry = async (fetchIndex, hashedProof, epochExpiration, retryCount = 3) => {
-    const newContract = await connectToPolygonIssue();
+const renewCertificateExpirationInBatchWithRetry = async (blockchainPreference, fetchIndex, hashedProof, epochExpiration, retryCount = 3) => {
+    var newContract;
+    if (blockchainPreference == 0) {
+        newContract = await connectToPolygonIssue();
+    } else {
+        newContract = await connectToStandbyIssue();
+    }
     if (!newContract) {
-        return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
     }
     // Perform Extend expiration of Certificate in the batch with retry mechanism 
     try {
@@ -1162,7 +1339,7 @@ const renewCertificateExpirationInBatchWithRetry = async (fetchIndex, hashedProo
                 console.log(`Unable to process the transaction. Retrying... Attempts left: ${retryCount}`);
                 // Retry after a delay (e.g., 1.5 seconds)
                 await holdExecution(1500);
-                return renewCertificateExpirationInBatchWithRetry(fetchIndex, hashedProof, epochExpiration, retryCount - 1);
+                return renewCertificateExpirationInBatchWithRetry(blockchainPreference, fetchIndex, hashedProof, epochExpiration, retryCount - 1);
             }
         }
 
@@ -1176,7 +1353,7 @@ const renewCertificateExpirationInBatchWithRetry = async (fetchIndex, hashedProo
             console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);
             // Retry after a delay (e.g., 2 seconds)
             await holdExecution(2000);
-            return renewCertificateExpirationInBatchWithRetry(fetchIndex, hashedProof, epochExpiration, retryCount - 1);
+            return renewCertificateExpirationInBatchWithRetry(blockchainPreference, fetchIndex, hashedProof, epochExpiration, retryCount - 1);
         } else if (error.code === 'NONCE_EXPIRED') {
             // Extract and handle the error reason
             // console.log("Error reason:", error.reason);
@@ -1203,10 +1380,15 @@ const renewCertificateExpirationInBatchWithRetry = async (fetchIndex, hashedProo
 };
 
 // Function to Perform Update Single Certificate status with retry mechanism 
-const updateSingleCertificateStatusWithRetry = async (certificateNumber, certStatus, retryCount = 3) => {
-    const newContract = await connectToPolygonIssue();
+const updateSingleCertificateStatusWithRetry = async (blockchainPreference, certificateNumber, certStatus, retryCount = 3) => {
+    var newContract;
+    if (blockchainPreference == 0) {
+        newContract = await connectToPolygonIssue();
+    } else {
+        newContract = await connectToStandbyIssue();
+    }
     if (!newContract) {
-        return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
     }
     try {
         // Perform Update Single Certificate status with retry mechanism 
@@ -1222,7 +1404,7 @@ const updateSingleCertificateStatusWithRetry = async (certificateNumber, certSta
                 console.log(`Unable to process the transaction. Retrying... Attempts left: ${retryCount}`);
                 // Retry after a delay (e.g., 1.5 seconds)
                 await holdExecution(1500);
-                return updateSingleCertificateStatusWithRetry(certificateNumber, certStatus, retryCount - 1);
+                return updateSingleCertificateStatusWithRetry(blockchainPreference, certificateNumber, certStatus, retryCount - 1);
             }
         }
 
@@ -1236,7 +1418,7 @@ const updateSingleCertificateStatusWithRetry = async (certificateNumber, certSta
             console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);
             // Retry after a delay (e.g., 2 seconds)
             await holdExecution(2000);
-            return updateSingleCertificateStatusWithRetry(certificateNumber, certStatus, retryCount - 1);
+            return updateSingleCertificateStatusWithRetry(blockchainPreference, certificateNumber, certStatus, retryCount - 1);
         } else if (error.code === 'NONCE_EXPIRED') {
             // Extract and handle the error reason
             // console.log("Error reason:", error.reason);
@@ -1263,10 +1445,15 @@ const updateSingleCertificateStatusWithRetry = async (certificateNumber, certSta
 };
 
 // Function to Perform Update Certificate status in Batch with retry mechanism 
-const updateCertificateStatusInBatchWithRetry = async (hashedProof, certStatus, retryCount = 3) => {
-    const newContract = await connectToPolygonIssue();
+const updateCertificateStatusInBatchWithRetry = async (blockchainPreference, hashedProof, certStatus, retryCount = 3) => {
+    var newContract;
+    if (blockchainPreference == 0) {
+        newContract = await connectToPolygonIssue();
+    } else {
+        newContract = await connectToStandbyIssue();
+    }
     if (!newContract) {
-        return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
     }
     try {
         // Perform Update Certificate status in Batch with retry mechanism
@@ -1282,7 +1469,7 @@ const updateCertificateStatusInBatchWithRetry = async (hashedProof, certStatus, 
                 console.log(`Unable to process the transaction. Retrying... Attempts left: ${retryCount}`);
                 // Retry after a delay (e.g., 1.5 seconds)
                 await holdExecution(1500);
-                return updateCertificateStatusInBatchWithRetry(certificateNumber, certificateHash, expirationEpoch, retryCount - 1);
+                return updateCertificateStatusInBatchWithRetry(blockchainPreference, certificateNumber, certificateHash, expirationEpoch, retryCount - 1);
             }
         }
 
@@ -1296,7 +1483,7 @@ const updateCertificateStatusInBatchWithRetry = async (hashedProof, certStatus, 
             console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);
             // Retry after a delay (e.g., 2 seconds)
             await holdExecution(2000);
-            return updateCertificateStatusInBatchWithRetry(certificateNumber, certificateHash, expirationEpoch, retryCount - 1);
+            return updateCertificateStatusInBatchWithRetry(blockchainPreference, certificateNumber, certificateHash, expirationEpoch, retryCount - 1);
         } else if (error.code === 'NONCE_EXPIRED') {
             // Extract and handle the error reason
             // console.log("Error reason:", error.reason);
@@ -1323,10 +1510,15 @@ const updateCertificateStatusInBatchWithRetry = async (hashedProof, certStatus, 
 };
 
 // Function to Perform Extend Batch expiration with retry mechanism 
-const updateBatchCertificateExpirationWithRetry = async (rootIndex, expirationEpoch, retryCount = 3) => {
-    const newContract = await connectToPolygonIssue();
+const updateBatchCertificateExpirationWithRetry = async (blockchainPreference, rootIndex, expirationEpoch, retryCount = 3) => {
+    var newContract;
+    if (blockchainPreference == 0) {
+        newContract = await connectToPolygonIssue();
+    } else {
+        newContract = await connectToStandbyIssue();
+    }
     if (!newContract) {
-        return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
     }
     try {
         // Perform Extend Batch expiration with retry mechanism 
@@ -1342,7 +1534,7 @@ const updateBatchCertificateExpirationWithRetry = async (rootIndex, expirationEp
                 console.log(`Unable to process the transaction. Retrying... Attempts left: ${retryCount}`);
                 // Retry after a delay (e.g., 1.5 seconds)
                 await holdExecution(1500);
-                return updateBatchCertificateExpirationWithRetry(rootIndex, expirationEpoch, retryCount - 1);
+                return updateBatchCertificateExpirationWithRetry(blockchainPreference, rootIndex, expirationEpoch, retryCount - 1);
             }
         }
 
@@ -1356,7 +1548,7 @@ const updateBatchCertificateExpirationWithRetry = async (rootIndex, expirationEp
             console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);
             // Retry after a delay (e.g., 2 seconds)
             await holdExecution(2000);
-            return updateBatchCertificateExpirationWithRetry(rootIndex, expirationEpoch, retryCount - 1);
+            return updateBatchCertificateExpirationWithRetry(blockchainPreference, rootIndex, expirationEpoch, retryCount - 1);
         } else if (error.code === 'NONCE_EXPIRED') {
             // Extract and handle the error reason
             // console.log("Error reason:", error.reason);
@@ -1383,10 +1575,15 @@ const updateBatchCertificateExpirationWithRetry = async (rootIndex, expirationEp
 };
 
 // Function to Perform Update Batch Status with retry mechanism 
-const updateBatchCertificateStatusWithRetry = async (rootIndex, certStatus, retryCount = 3) => {
-    const newContract = await connectToPolygonIssue();
+const updateBatchCertificateStatusWithRetry = async (blockchainPreference, rootIndex, certStatus, retryCount = 3) => {
+    var newContract;
+    if (blockchainPreference == 0) {
+        newContract = await connectToPolygonIssue();
+    } else {
+        newContract = await connectToStandbyIssue();
+    }
     if (!newContract) {
-        return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
     }
     try {
         // Perform Update Batch Status with retry mechanism 
@@ -1402,7 +1599,7 @@ const updateBatchCertificateStatusWithRetry = async (rootIndex, certStatus, retr
                 console.log(`Unable to process the transaction. Retrying... Attempts left: ${retryCount}`);
                 // Retry after a delay (e.g., 1.5 seconds)
                 await holdExecution(1500);
-                return updateBatchCertificateStatusWithRetry(rootIndex, certStatus, retryCount - 1);
+                return updateBatchCertificateStatusWithRetry(blockchainPreference, rootIndex, certStatus, retryCount - 1);
             }
         }
         return {
@@ -1415,7 +1612,7 @@ const updateBatchCertificateStatusWithRetry = async (rootIndex, certStatus, retr
             console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);
             // Retry after a delay (e.g., 2 seconds)
             await holdExecution(2000);
-            return updateBatchCertificateStatusWithRetry(rootIndex, certStatus, retryCount - 1);
+            return updateBatchCertificateStatusWithRetry(blockchainPreference, rootIndex, certStatus, retryCount - 1);
         } else if (error.code === 'NONCE_EXPIRED') {
             // Extract and handle the error reason
             // console.log("Error reason:", error.reason);

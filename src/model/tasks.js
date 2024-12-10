@@ -676,6 +676,7 @@ const insertIssuanceCertificateData = async (data) => {
       grantDate: data?.grantDate,
       expirationDate: data?.expirationDate,
       certificateStatus: 6,
+      blockchainOption: data?.blockchainOption,
       issueDate: Date.now() // Set the issue date to the current timestamp
     });
 
@@ -729,6 +730,7 @@ const insertCertificateData = async (data) => {
       width: data?.width || without_pdf_width,
       height: data?.height || without_pdf_height,
       qrOption: data?.qrOption || 0,
+      blockchainOption: data?.blockchainOption,
       url: data?.url || '',
       type: data?.type || '',
       issueDate: Date.now() // Set the issue date to the current timestamp
@@ -777,6 +779,7 @@ const insertDynamicCertificateData = async (data) => {
       width: data?.width || without_pdf_width,
       height: data?.height || without_pdf_height,
       qrOption: data?.qrOption || 0,
+      blockchainOption: data?.blockchainOption,
       url: data?.url,
       type: 'dynamic',
       issueDate: Date.now() // Set the issue date to the current timestamp
@@ -832,6 +835,7 @@ const insertBatchCertificateData = async (data) => {
       width: data?.width || without_pdf_width,
       height: data?.height || without_pdf_height,
       qrOption: data?.qrOption || 0,
+      blockchainOption: data?.blockchainOption,
       issueDate: Date.now()
     });
 
@@ -876,6 +880,7 @@ const insertDynamicBatchCertificateData = async (data) => {
       width: data?.width || without_pdf_width,
       height: data?.height || without_pdf_height,
       qrOption: data?.qrOption || 0,
+      blockchainOption: data?.blockchainOption,
       url: data?.url || '',
       type: 'dynamic',
       issueDate: Date.now()
@@ -919,6 +924,7 @@ const insertIssueStatus = async (issueData) => {
       name: issueData?.name,
       expirationDate: formattedDate, // ExpirationDate field is of type String and is required
       certStatus: issueData?.certStatus,
+      blockchainOption: issueData?.blockchainOption,
       lastUpdate: Date.now()
     });
     const updateLog = await newIssueStatus.save();

@@ -31,7 +31,8 @@ const {
   checkTransactionStatus,
   renameUploadPdfFile,
   wipeSourceFile,
-  verificationWithDatabase
+  verificationWithDatabase,
+  connectToStandby
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
 
 var messageCode = require("../common/codes");
@@ -976,7 +977,7 @@ const verifyBatch = async (req, res) => {
       const excelMessage = excelResponse?.message;
       const excelDetails = excelResponse?.Details;
       await wipeSourceFile(req.file.path);
-      if(statusCode == 200){
+      if (statusCode == 200) {
         return res.status(statusCode).json({
           code: statusCode,
           status: excelStatus,
@@ -987,7 +988,7 @@ const verifyBatch = async (req, res) => {
           invalid: excelResponse?.invalid,
           revoked: excelResponse?.revoked
         });
-      } 
+      }
       return res.status(statusCode).json({
         code: statusCode,
         status: excelStatus,
@@ -1002,7 +1003,7 @@ const verifyBatch = async (req, res) => {
       const csvMessage = csvResponse?.message;
       const csvDetails = csvResponse?.Details;
       await wipeSourceFile(req.file.path);
-      if(statusCode == 200){
+      if (statusCode == 200) {
         return res.status(statusCode).json({
           code: statusCode,
           status: statusCode,
@@ -1013,7 +1014,7 @@ const verifyBatch = async (req, res) => {
           invalid: csvResponse?.invalid,
           revoked: csvResponse?.revoked
         });
-      } 
+      }
       return res.status(statusCode).json({
         code: statusCode,
         status: csvStatus,
@@ -1039,7 +1040,6 @@ const verifyBatch = async (req, res) => {
   }
 };
 
-
 // Function to verify the ID (Single) with Smart Contract with Retry
 const verifySingleCertificationWithRetry = async (certificateId, retryCount = 3) => {
   const newContract = await connectToPolygon();
@@ -1063,8 +1063,30 @@ const verifySingleCertificationWithRetry = async (certificateId, retryCount = 3)
         return 2;
       }
       return 1;
+    } else {
+      var standbyContract = await connectToStandby();
+      if (!standbyContract) {
+        return 0;
+      }
+      // Blockchain processing.
+      let verifyCert = await standbyContract.verifyCertificateById(certificateId);
+      let _certStatus = await standbyContract.getCertificateStatus(certificateId);
+
+      if (verifyCert) {
+        let verifyCertStatus = parseInt(verifyCert[3]);
+        if (_certStatus) {
+          let certStatus = parseInt(_certStatus);
+          if (certStatus == 3) {
+            return 3;
+          }
+        }
+        if (verifyCert[0] === false && verifyCertStatus == 5) {
+          return 2;
+        }
+        return 1;
+      }
+      return 0
     }
-    return 0;
   } catch (error) {
     if (retryCount > 0 && error.code === 'ETIMEDOUT') {
       console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);
@@ -1086,7 +1108,7 @@ const verifySingleCertificationWithRetry = async (certificateId, retryCount = 3)
 const verifyBatchCertificationWithRetry = async (batchNumber, dataHash, proof, hashProof, retryCount = 3) => {
   const newContract = await connectToPolygon();
   if (!newContract) {
-    return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+    return 0;
   }
   try {
     // Blockchain processing.
@@ -1104,8 +1126,29 @@ const verifyBatchCertificationWithRetry = async (batchNumber, dataHash, proof, h
         return 2;
       }
       return 1;
+    } else {
+      var standbyContract = await connectToStandby();
+      if (!standbyContract) {
+        return 0;
+      }
+      // Blockchain processing.
+      let batchVerifyResponse = await standbyContract.verifyBatchCertification(batchNumber, dataHash, proof);
+      let _responseStatus = await standbyContract.verifyCertificateInBatch(hashProof);
+      let responseStatus = parseInt(_responseStatus);
+      if (batchVerifyResponse) {
+        if (responseStatus) {
+          if (responseStatus == 3) {
+            return 3;
+          }
+        }
+        if (responseStatus == 5) {
+          return 2;
+        }
+        return 1;
+      }
+      return 0;
     }
-    return 0;
+
   } catch (error) {
     if (retryCount > 0 && error.code === 'ETIMEDOUT') {
       console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);

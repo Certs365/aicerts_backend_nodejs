@@ -856,7 +856,8 @@ const batchIssueCertificate = async (req, res) => {
                 qrSize: staticQrSize,
                 width: withoutPdfWidth,
                 height: withoutPdfHeight,
-                qrOption: qrOption
+                qrOption: qrOption,
+                blockchainOption: blockchainPreference
               }
 
               let _fields = {

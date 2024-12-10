@@ -389,6 +389,7 @@ const handleIssueCertification = async (
                 width: withoutPdfWidth,
                 height: withoutPdfHeight,
                 qrOption: qrOption,
+                blockchainOption: blockchainPreference,
                 type: "withoutpdf",
               };
               // Insert certificate data into database
@@ -764,6 +765,7 @@ const handleIssuance = async (
               course: fields.courseName,
               grantDate: fields.Grant_Date,
               expirationDate: fields.Expiration_Date,
+              blockchainOption: blockchainPreference || 0,
             };
 
             // Insert certificate data into database
@@ -1064,6 +1066,8 @@ const handleIssuePdfCertification = async (
         combinedHash,
         epochExpiration
       );
+      // var txHash = 'temporary hash';
+      // var txFee = 1.20;
       if (!txHash) {
         await wipeSourceFile(pdfPath);
         return {
@@ -1205,6 +1209,7 @@ const handleIssuePdfCertification = async (
           width: width,
           height: height,
           qrOption: qrOption,
+          blockchainOption: blockchainPreference,
           url: imageUrl,
           type: "withpdf",
         };
@@ -1574,6 +1579,7 @@ const handleIssueDynamicPdfCertification = async (
           width: width,
           height: height,
           qrOption: qrOption,
+          blockchainOption: blockchainPreference,
           url: imageUrl,
           customFields: _customFields,
         };
@@ -1982,6 +1988,7 @@ const handleIssueDynamicCertification = async (
           width: width,
           height: height,
           qrOption: qrOption,
+          blockchainOption: blockchainPreference,
           url: imageUrl,
           type: "withpdf",
         };
@@ -2294,6 +2301,7 @@ const dynamicBulkCertificates = async (
               width: pdfWidth,
               height: pdfHeight,
               qrOption: qrOption,
+              blockchainOption: blockchainPreference,
               url: imageUrl,
             };
             // await insertCertificateData(certificateData);
@@ -2518,7 +2526,13 @@ const dynamicBatchCertificates = async (
         };
       }
 
-      var linkUrl = `https://${process.env.NETWORK}/tx/${txHash}`;
+      var linkUrl;
+      if (blockchainPreference == 0) {
+        linkUrl = `https://${process.env.NETWORK}/tx/${txHash}`;
+      } else {
+        linkUrl = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+      }
+      var blockchainOption = blockchainPreference;
 
       if (pdfResponse.length == _excelResponse[1]) {
         console.log("working directory", __dirname);
@@ -2564,7 +2578,8 @@ const dynamicBatchCertificates = async (
           customFolder,
           flag,
           qrOption,
-          queueId
+          blockchainOption,
+          queueId,
 
         });
         // Add jobs in chunks with custom job data

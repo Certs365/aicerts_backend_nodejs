@@ -98,6 +98,7 @@ async function processBulkIssueJob(job) {
     flag,
     customFolder,
     qrOption,
+    blockchainOption,
     queueId
   } = job.data;
 
@@ -126,6 +127,7 @@ async function processBulkIssueJob(job) {
         flag,
         customFolder,
         qrOption,
+        blockchainOption,
         certificateDataArray,
       });
 
@@ -181,6 +183,7 @@ async function processSinglePdf({
   insertPromises,
   customFolder,
   qrOption,
+  blockchainOption,
   certificateDataArray,
 }) {
   try {
@@ -315,6 +318,7 @@ async function processSinglePdf({
       width: pdfWidth,
       height: pdfHeight,
       qrOption: qrOption,
+      blockchainOption: blockchainOption,
       url: imageUrl,
       positionX: posx,
       positionY: posy,
@@ -496,6 +500,7 @@ const insertDynamicBatchCertificateDataBulk = async (dataArray) => {
       width: data?.width || 0,
       height: data?.height || 0,
       qrOption: data?.qrOption || 0,
+      blockchainOption: data?.blockchainOption || 0,
       url: data?.url || '',
       type: 'dynamic',
       issueDate: Date.now()
@@ -516,6 +521,7 @@ const insertDynamicBatchCertificateDataBulk = async (dataArray) => {
       name: data.name,
       expirationDate: 0, // Default, update if necessary
       certStatus: 1, // Set certStatus as needed
+      blockchainOption: data?.blockchainOption || 0,
       lastUpdate: Date.now()
     }));
   
