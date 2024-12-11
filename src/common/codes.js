@@ -17,7 +17,7 @@ module.exports = {
 
     // Handle Excel File messages
     msgInvalidExcel: "Invalid Excel file, Please try again",
-    msgExcelLimit: "Application can support process credentials maximum ",
+    msgExcelLimit: "Application can support to process credentials maximum ",
     msgInvalidCertIds: "Excel file has invalid credential IDs length (each: min 12 - max 25)",
     msgInvalidDocIds: "Input has invalid Document ID format (no special characters) / length (min 6 - max 50)",
     msgExcelRepetetionIds: "Excel file has repetition in credentail IDs",
