@@ -936,7 +936,7 @@ const handleUpdateCertificationStatus = async (email, certificateNumber, certSta
                     return ({ code: 400, status: "FAILED", message: messageCode.msgStatusAlreadyExist });
                 }
 
-                var blockchainOption = (!isNumberExist.blockchainOption || isNumberExist.blockchainOption == 0) ? 0 : 1;
+                var blockchainOption = (!isNumberExistInBatchDynamic.blockchainOption || isNumberExistInBatchDynamic.blockchainOption == 0) ? 0 : 1;
 
                 if (blockchainPreference != blockchainOption) {
                     if (blockchainPreference == 0) {

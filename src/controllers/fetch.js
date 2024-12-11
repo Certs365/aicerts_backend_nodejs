@@ -682,7 +682,7 @@ const adminSearchWithFilter = async (req, res) => {
     var startIndex;
     var endIndex;
     var certStatusFilter;
-    var expirationDateFilter = null;
+    var expirationDateFilter = undefined;
     await isDBConnected();
     const isEmailExist = await isValidIssuer(email);
     if (!isEmailExist) {
@@ -785,10 +785,10 @@ const adminSearchWithFilter = async (req, res) => {
         if (query2Result.length > 0) {
           fetchedIssues = fetchedIssues.concat(query2Result);
         }
-        if (query3Result.length > 0) {
+        if (query3Result.length > 0 && status != 1) {
           fetchedIssues = fetchedIssues.concat(query3Result);
         }
-        if (query4Result.length > 0) {
+        if (query4Result.length > 0 && status != 1) {
           fetchedIssues = fetchedIssues.concat(query4Result);
         }
 
