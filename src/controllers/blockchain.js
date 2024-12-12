@@ -692,7 +692,6 @@ const allocateCredits = async (req, res) => {
     3: 'revoke',
     4: 'reactivate'
   };
-
   var service = parseInt(_service);
   var credits = parseInt(_credits);
 

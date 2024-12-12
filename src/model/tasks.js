@@ -142,7 +142,6 @@ const isValidIssuer = async (email) => {
       },
       status: 1
     }).select('-password');
-
     return validIssuer;
   } catch (error) {
     console.log("An error occured", error);
