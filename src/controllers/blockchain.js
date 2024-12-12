@@ -739,7 +739,6 @@ const allocateCredits = async (req, res) => {
       fetchServiceQuota.status = activeStatus;
       fetchServiceQuota.updatedAt = new Date();
       await fetchServiceQuota.save();
-
       let updatedDetails = {
         newLimit: newLimit,
         serviceType: serviceName,
