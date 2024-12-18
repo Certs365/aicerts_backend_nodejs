@@ -17,6 +17,8 @@ const moment = require('moment');
 
 const { decryptData } = require("../common/cryptoFunction"); // Custom functions for cryptographic operations
 
+const cloudBucket = '.png';
+const limitThreshold = process.env.LIMIT_THRESHOLD;
 const retryDelay = parseInt(process.env.TIME_DELAY);
 const maxRetries = 3; // Maximum number of retries
 const schedule_days = parseInt(process.env.UPDATE_QUOTAS_DAYS) || 7;
@@ -26,9 +28,11 @@ const without_pdf_height = parseInt(process.env.WITHOUT_PDF_HEIGHT);
 
 // Import ABI (Application Binary Interface) from the JSON file located at "../config/abi.json"
 const abi = require("../config/abi.json");
+const standbyAbi = require("../config/standbyAbi.json");
 
 // Retrieve contract address from environment variable
 const contractAddress = process.env.CONTRACT_ADDRESS;
+const standbyContractAddress = process.env.STANDBY_CONTRACT_ADDRESS;
 const polygonApiKey = process.env.POLYGON_API_KEY || null;
 
 // RPC PROVIDERS
@@ -36,12 +40,25 @@ const alchemyKey = process.env.ISSUE_ALCHEMY_API_KEY || process.env.ALCHEMY_API_
 const infuraKey = process.env.ISSUE_INFURA_API_KEY || process.env.INFURA_API_KEY;
 const chainKey = process.env.ISSUE_CHAIN_KEY || process.env.CHAIN_KEY;
 
+// STANDBY RPC PROVIDERS
+const standbyAlchemyKey = process.env.STANDBY_ISSUE_ALCHEMY_API_KEY || process.env.STANDBY_ALCHEMY_API_KEY;
+const standbyInfuraKey = process.env.STANDBY_ISSUE_INFURA_API_KEY || process.env.STANDBY_INFURA_API_KEY;
+const standbyChainKey = process.env.STANDBY_ISSUE_CHAIN_KEY || process.env.STANDBY_CHAIN_KEY;
+
 // Define an array of providers to use as fallbacks
 const providers = [
   new ethers.AlchemyProvider(process.env.RPC_NETWORK, process.env.ALCHEMY_API_KEY),
   new ethers.InfuraProvider(process.env.RPC_NETWORK, process.env.INFURA_API_KEY),
   // new ethers.ChainstackProvider(process.env.RPC_NETWORK, process.env.CHAIN_KEY)
   // new ethers.JsonRpcProvider(process.env.CHAIN_RPC)
+  // Add more providers as needed
+];
+
+const standbyProviders = [
+  new ethers.AlchemyProvider(process.env.STANDBY_RPC_NETWORK, process.env.STANDBY_ALCHEMY_API_KEY),
+  new ethers.InfuraProvider(process.env.STANDBY_RPC_NETWORK, process.env.STANDBY_INFURA_API_KEY),
+  // new ethers.ChainstackProvider(process.env.STANDBY_RPC_NETWORK, process.env.STANDBY_CHAIN_KEY)
+  // new ethers.JsonRpcProvider(process.env.STANDBY_CHAIN_RPC)
   // Add more providers as needed
 ];
 
@@ -54,8 +71,20 @@ const issueProviders = [
   // Add more providers as needed
 ];
 
+const standbyIssueProviders = [
+  new ethers.AlchemyProvider(process.env.STANDBY_RPC_NETWORK, standbyAlchemyKey),
+  new ethers.InfuraProvider(process.env.STANDBY_RPC_NETWORK, standbyInfuraKey),
+  // new ethers.ChainstackProvider(process.env.STANDBY_RPC_NETWORK, standbyChainKey)
+  // new ethers.JsonRpcProvider(process.env.STANDBY_ISSUE_CHAIN_RPC)
+  // Add more providers as needed
+];
+
+
 // Create a new FallbackProvider instance
 const fallbackProvider = new ethers.FallbackProvider(providers);
+const standbyFallbackProvider = new ethers.FallbackProvider(standbyProviders);
+
+const messageCode = require("../common/codes");
 
 const excludeUrlContent = "/verify-documents";
 
@@ -106,10 +135,13 @@ const isValidIssuer = async (email) => {
   }
   try {
     var validIssuer = await User.findOne({
-      email: email,
+      $expr: {
+        $and: [
+          { $eq: [{ $toLower: "$email" }, email.toLowerCase()] }
+        ]
+      },
       status: 1
     }).select('-password');
-
     return validIssuer;
   } catch (error) {
     console.log("An error occured", error);
@@ -151,6 +183,40 @@ const connectToPolygon = async (retryCount = 0) => {
   }
 };
 
+//Connect to tandby blockchain contract
+const connectToStandby = async (retryCount = 0) => {
+  let fallbackProvider;
+  // Create a fallback provider
+  try {
+    fallbackProvider = new ethers.FallbackProvider(standbyProviders);
+  } catch (error) {
+    console.error('Failed to create fallback provider:', error.message);
+    return;
+  }
+
+  try {
+    // Create a new ethers signer instance using the private key from environment variable and the provider(Fallback)
+    const signer = new ethers.Wallet(process.env.PRIVATE_KEY, fallbackProvider);
+
+    // Create a new ethers contract instance with a signing capability (using the contract Address, ABI and signer)
+    const newContract = new ethers.Contract(standbyContractAddress, standbyAbi, signer);
+
+    return newContract;
+
+  } catch (error) {
+    if (retryCount < maxRetries) {
+      console.error('Failed to connect to Polygon node:', error.message);
+      console.log(`Retrying connection in ${2500 / 1000} seconds... (Retry ${retryCount + 1} of ${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, 2500)); // Wait before retrying
+      return connectToStandby(retryCount + 1); // Retry connecting with incremented retry count
+    } else {
+      console.error('Max retries reached. Unable to connect to Polygon node.');
+      // throw error; // Re-throw the error after max retries
+      return null;
+    }
+  }
+};
+
 const connectToPolygonIssue = async (retryCount = 0) => {
   let fallbackProvider;
   // Create a fallback provider
@@ -178,6 +244,39 @@ const connectToPolygonIssue = async (retryCount = 0) => {
       return connectToPolygon(retryCount + 1); // Retry connecting with incremented retry count
     } else {
       console.error('Max retries reached. Unable to connect to Polygon node.');
+      // throw error; // Re-throw the error after max retries
+      return null;
+    }
+  }
+};
+
+const connectToStandbyIssue = async (retryCount = 0) => {
+  let fallbackProvider;
+  // Create a fallback provider
+  try {
+    fallbackProvider = new ethers.FallbackProvider(standbyIssueProviders);
+  } catch (error) {
+    console.error('Failed to create fallback provider:', error.message);
+    return;
+  }
+
+  try {
+    // Create a new ethers signer instance using the private key from environment variable and the provider(Fallback)
+    const signer = new ethers.Wallet(process.env.PRIVATE_KEY, fallbackProvider);
+
+    // Create a new ethers contract instance with a signing capability (using the contract Address, ABI and signer)
+    const standbyContract = new ethers.Contract(standbyContractAddress, standbyAbi, signer);
+
+    return standbyContract;
+
+  } catch (error) {
+    if (retryCount < maxRetries) {
+      console.error('Failed to connect to Standby node:', error.message);
+      console.log(`Retrying connection in ${2500 / 1000} seconds... (Retry ${retryCount + 1} of ${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, 2500)); // Wait before retrying
+      return connectToStandbyIssue(retryCount + 1); // Retry connecting with incremented retry count
+    } else {
+      console.error('Max retries reached. Unable to connect to Standby node.');
       // throw error; // Re-throw the error after max retries
       return null;
     }
@@ -469,21 +568,6 @@ const convertEpochIntoDate = async (epochTimestamp) => {
     const dateString = `${month}/${day}/${year}`;
     return dateString;
   }
-}
-
-const convertExpirationStatusLog = async (_date) => {
-  if (_date == "1" || _date == null) {
-    return "1";
-  }
-  // Parse the date string into a Date object
-  const dateParts = (_date).split('/');
-  const year = parseInt(dateParts[4]) + 2000; // Assuming 4-digit year represents 2000s
-  const month = parseInt(dateParts[0]) - 1; // Months are zero-indexed
-  const day = parseInt(dateParts[1]);
-  // Create a Date object
-  const date = new Date(year, month, day);
-  // Format the date in ISO 8601 format with UTC offset
-  return date.toISOString();
 };
 
 // Verify Certification ID from both collections (single / batch)
@@ -591,6 +675,7 @@ const insertIssuanceCertificateData = async (data) => {
       grantDate: data?.grantDate,
       expirationDate: data?.expirationDate,
       certificateStatus: 6,
+      blockchainOption: data?.blockchainOption,
       issueDate: Date.now() // Set the issue date to the current timestamp
     });
 
@@ -644,6 +729,7 @@ const insertCertificateData = async (data) => {
       width: data?.width || without_pdf_width,
       height: data?.height || without_pdf_height,
       qrOption: data?.qrOption || 0,
+      blockchainOption: data?.blockchainOption,
       url: data?.url || '',
       type: data?.type || '',
       issueDate: Date.now() // Set the issue date to the current timestamp
@@ -692,6 +778,7 @@ const insertDynamicCertificateData = async (data) => {
       width: data?.width || without_pdf_width,
       height: data?.height || without_pdf_height,
       qrOption: data?.qrOption || 0,
+      blockchainOption: data?.blockchainOption,
       url: data?.url,
       type: 'dynamic',
       issueDate: Date.now() // Set the issue date to the current timestamp
@@ -747,6 +834,7 @@ const insertBatchCertificateData = async (data) => {
       width: data?.width || without_pdf_width,
       height: data?.height || without_pdf_height,
       qrOption: data?.qrOption || 0,
+      blockchainOption: data?.blockchainOption,
       issueDate: Date.now()
     });
 
@@ -791,6 +879,7 @@ const insertDynamicBatchCertificateData = async (data) => {
       width: data?.width || without_pdf_width,
       height: data?.height || without_pdf_height,
       qrOption: data?.qrOption || 0,
+      blockchainOption: data?.blockchainOption,
       url: data?.url || '',
       type: 'dynamic',
       issueDate: Date.now()
@@ -834,6 +923,7 @@ const insertIssueStatus = async (issueData) => {
       name: issueData?.name,
       expirationDate: formattedDate, // ExpirationDate field is of type String and is required
       certStatus: issueData?.certStatus,
+      blockchainOption: issueData?.blockchainOption,
       lastUpdate: Date.now()
     });
     const updateLog = await newIssueStatus.save();
@@ -1637,16 +1727,24 @@ const sendEmail = async (name, email) => {
     // Update the mailOptions object with the recipient's email address and email body
     mailOptions.to = email;
     mailOptions.subject = `Your Certs365 Account is Approved!`;
-    mailOptions.text = `Hi ${name},
-
-Congratulations! Your account has been successfully approved by our admin team.
-
-You can now log in to your profile using your username ${email}. We are excited to have you on board!
-
-If you have any questions or need assistance, feel free to reach out.
-
-Best regards,
-The Certs365 Team.`;
+    mailOptions.html = `
+<html>
+    <body style="font-family: Arial, sans-serif; color: #333; background-color: #f4f4f4; padding: 20px;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+            <h3 style="color: #4CAF50;">Hi  <strong>${name}</strong>,</h3>
+            <p>Congratulations! Your account has been successfully approved by our admin team.</p>
+            <p>You can now log in to your profile using your username <strong>${email}</strong>. We are excited to have you on board!</p>
+            <p>If you have any questions or need assistance, feel free to reach out.</p>
+            <br>
+            <p>Best regards,</p>
+            <p>The Certs365 Team</p>
+            <hr>
+            <p style="font-size: 12px; color: #999;">
+                ${messageCode.msgEmailNote}
+            </p>
+        </div>
+    </body>
+</html>`;
 
     // Send the email using the configured transporter
     transporter.sendMail(mailOptions);
@@ -1668,16 +1766,29 @@ const rejectEmail = async (name, email) => {
   try {
     // Update the mailOptions object with the recipient's email address and email body
     mailOptions.to = email;
-    mailOptions.subject = `Your Certs365 Account Registration Status`;
-    mailOptions.text = `Hi ${name},
-
-We regret to inform you that your account registration has been declined by our admin team.
-
-If you have any questions or need further clarification, please do not hesitate to contact us. Thank you for your interest in AICerts.
-
-Best regards,
-The Certs365 Team.`;
-
+    mailOptions.subject = `Your Certs365 Account is Rejected!`;
+    mailOptions.html = `
+<html>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; padding: 20px;">
+    <div style="max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px; background-color: #f9f9f9;">
+      <h3 style="color: #d9534f;">Hi ${name},</h3>
+      <p style="color: #555;">
+        We regret to inform you that your account registration has been <strong>declined</strong> by our admin team.
+      </p>
+      <p style="color: #555;">
+        If you have any questions or need further clarification, please do not hesitate to <a href="mailto:Noreply@certs365.io" style="color: #007bff; text-decoration: none;">contact us</a>.
+      </p>
+      <p style="color: #555;">Thank you for your interest in Certs365.</p>
+      <br>
+      <p style="font-weight: bold;">Best regards,</p>
+      <p><strong>The Certs365 Team</strong></p>
+      <hr>
+        <p style="font-size: 12px; color: #999;">
+        ${messageCode.msgEmailNote}
+        </p>
+    </div>
+  </body>
+</html>`;
     // Send the email using the configured transporter
     transporter.sendMail(mailOptions);
     console.log('Email sent successfully');
@@ -1742,7 +1853,10 @@ const getContractAddress = async (contractAddress, maxRetries = 3, delay = 1000)
 
   while (attempt < maxRetries) {
     try {
-      const code = await fallbackProvider.getCode(contractAddress);
+      var code = await fallbackProvider.getCode(contractAddress);
+      if(!code){
+        code = await standbyFallbackProvider.getCode(contractAddress);
+      }
 
       if (code === '0x') {
         console.log('RPC provider is not responding');
@@ -1837,7 +1951,64 @@ const generateCustomFolder = async (folderName) => {
   } catch (error) {
     console.error("Error occuered while generating custom folder name", error);
   }
-}
+};
+
+// Function to verify the ID with DB
+const verificationWithDatabase = async (certId) => {
+  if (!certId) {
+    return 0;
+  }
+  var resultCert = 0;
+
+  try {
+    await isDBConnected();
+
+    const commonFilter = {
+      certificateNumber: { $in: certId },
+      // url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket }
+    };
+
+    // Fetch all issues across different models
+    const [issues, batchIssues, dynamicIssues, dynamicBatchIssues] = await Promise.all([
+      Issues.find(commonFilter, { certificateStatus: 1 }).lean(),
+      BatchIssues.find(commonFilter, { certificateStatus: 1 }).lean(),
+      DynamicIssues.find(commonFilter, { certificateStatus: 1 }).lean(),
+      DynamicBatchIssues.find(commonFilter, { certificateStatus: 1 }).lean()
+    ]);
+
+    // Organize issues based on their source
+    const result = {
+      issues,
+      batchIssues,
+      dynamicIssues,
+      dynamicBatchIssues,
+    };
+
+    // Log the response if any array has a length of 1
+    Object.entries(result).forEach(([key, value]) => {
+      if (value && value.length === 1) {
+        // console.log(`The response for '${key}' has exactly 1 item:`, value);
+        resultCert = value;
+      }
+    });
+
+    if (resultCert != 0) {
+      // console.log("The result:", resultCert, resultCert[0]?.certificateStatus);
+      var statusResponse = resultCert[0]?.certificateStatus;
+      if(statusResponse == 3){
+        return 3;
+      }
+      return 1;
+    }
+
+    return 0;
+
+  } catch (error) {
+    console.error("An error occured while fetching data ", error);
+    return 0;
+  }
+
+};
 
 module.exports = {
 
@@ -1850,10 +2021,14 @@ module.exports = {
   // Function to test contract response
   getContractAddress,
 
-  // Function to Connect to Polygon 
+  // Function to Connect to Polygon / Standby
   connectToPolygon,
 
+  connectToStandby,
+
   connectToPolygonIssue,
+
+  connectToStandbyIssue,
 
   // Function to validate standard date format MM/DD/YYYY.
   validateSearchDateFormat,
@@ -1985,4 +2160,7 @@ module.exports = {
   getLatestTransferDate,
 
   generateCustomFolder,
+
+  // Function to verify the ID with DB
+  verificationWithDatabase,
 };

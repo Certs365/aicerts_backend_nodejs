@@ -97,7 +97,7 @@ const validationRoutes = {
         body("email").notEmpty().withMessage(messageCode.msgNonEmpty).trim().isEmail().withMessage(messageCode.msgInvalidEmail),
         body("status").notEmpty().isBoolean().withMessage(messageCode.msgInvalidStatus),
         body("service").notEmpty().trim().isNumeric().withMessage(messageCode.msgNonEmpty).isIn([1, 2, 3, 4]).withMessage(messageCode.msgProvideValidService),
-        body("credits").notEmpty().trim().isNumeric().withMessage(messageCode.msgNonEmpty).isInt({ min: 1, max: 100 }).withMessage(messageCode.msgMaximumRange),
+        // body("credits").notEmpty().trim().isNumeric().withMessage(messageCode.msgNonEmpty).isInt({ min: 0, max: 100 }).withMessage(messageCode.msgMaximumRange),
     ],
     searchCertification: [
         body("email").notEmpty().withMessage(messageCode.msgNonEmpty).trim().isEmail().withMessage(messageCode.msgInvalidEmail),

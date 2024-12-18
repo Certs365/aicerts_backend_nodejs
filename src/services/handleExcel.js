@@ -8,7 +8,12 @@ const {
   isCertificationIdExisted,
   wipeSourceFolder,
   generateCustomFolder,
+  verificationWithDatabase,
 } = require("../model/tasks"); // Importing functions from the '../model/tasks' module
+
+const {
+  verifySingleCertificationWithRetry
+} = require("../controllers/verify");
 
 // Import MongoDB models
 const { Issues, DynamicBatchIssues } = require("../config/schema");
@@ -21,6 +26,7 @@ const min_length = 6;
 const max_length = 50;
 const cert_limit = parseInt(process.env.BATCH_LIMIT);
 const sheetName = process.env.SHEET_NAME || "Batch";
+const validationSheetName = "Validation";
 
 // Regular expression to match MM/DD/YY format
 const regex = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/;
@@ -43,7 +49,7 @@ const expectedBulkHeadersSchema = [
 ];
 
 const messageCode = require("../common/codes");
-const { cleanUpJobs, _cleanUpJobs, addJobsInChunks, processExcelJob, cleanRedis } = require("../queue_service/queueUtils");
+const { cleanUpJobs, _cleanUpJobs, addJobsInChunks, processExcelJob } = require("../queue_service/queueUtils");
 
 const handleExcelFile = async (_path) => {
   if (!_path) {
@@ -624,7 +630,7 @@ const handleBatchExcelFile = async (_path, issuer) => {
           rawBatchData,
           chunkSize,
           issuerId,
-          (chunk,issuerId) => ({ chunk, rows, issuerId }) // Include batchId in job data
+          (chunk, issuerId) => ({ chunk, rows, issuerId }) // Include batchId in job data
         );
 
         // Assuming `jobs` is an array of job objects

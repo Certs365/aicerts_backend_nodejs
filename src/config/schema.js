@@ -52,6 +52,7 @@ const UserSchema = new Schema({
   username: { type: String, unique: true },
   rejectedDate: { type: Date, default: null },
   invoiceNumber: { type: Number, default: 0 },
+  batchSequence: { type: Number, default: 0 },
   transactionFee: { type: Number, default: 0 },
   qrPreference: { type: Number, default: 0 },
   blockchainPreference: { type: Number, default: 0 },
@@ -78,6 +79,7 @@ const IssuesSchema = new mongoose.Schema({
   width: { type: Number },
   height: { type: Number },
   qrOption: { type: Number, default: 0 },
+  blockchainOption: { type: Number, default: 0 },
   url: { type: String },
   type: { type: String, default: null }
 });
@@ -103,6 +105,7 @@ const BatchIssuesSchema = new Schema({
   width: { type: Number },
   height: { type: Number },
   qrOption: { type: Number, default: 0 },
+  blockchainOption: { type: Number, default: 0 },
   url: { type: String }
 });
 
@@ -117,6 +120,7 @@ const IssueStatusSchema = new mongoose.Schema({
   course: { type: String, default: 0 },
   expirationDate: { type: String, default: 0 }, // ExpirationDate field is of type String and is required
   certStatus: { type: Number },
+  blockchainOption: { type: Number, default: 0 },
   lastUpdate: { type: Date, default: Date.now } // IssueDate field is of type Date and defaults to the current date/time
 });
 
@@ -136,6 +140,7 @@ const DynamicIssuesSchema = new mongoose.Schema({
   positionY: { type: Number, default: 0},
   qrSize: { type: Number, default: 0},
   qrOption: { type: Number, default: 0 },
+  blockchainOption: { type: Number, default: 0 },
   url: { type: String },
   type: { type: String, default: 'dynamic' }
 });
@@ -159,6 +164,7 @@ const DynamicBatchIssuesSchema = new mongoose.Schema({
   positionY: { type: Number, default: 0},
   qrSize: { type: Number, default: 0},
   qrOption: { type: Number, default: 0 },
+  blockchainOption: { type: Number, default: 0 },
   url: { type: String },
   type: { type: String, default: 'dynamic' }
 });
@@ -190,7 +196,6 @@ const DynamicParamsSchema = new mongoose.Schema({
   modifiedDate: { type: Date, default: Date.now } // issueDate field is of type Date and defaults to the current date/time
 });
 
-
 const Admin = mongoose.model('Admin', AdminSchema);
 const ServiceAccountQuotas = mongoose.model('ServiceAccountQuotas', ServiceAccountQuotasSchema);
 const User = mongoose.model('User', UserSchema);
@@ -216,5 +221,5 @@ module.exports = {
   DynamicBatchIssues,
   VerificationLog,
   ShortUrl,
-  DynamicParameters
+  DynamicParameters,
 };

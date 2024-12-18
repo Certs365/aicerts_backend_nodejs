@@ -4,10 +4,15 @@ require('dotenv').config();
 // Import required modules
 const fs = require("fs");
 const path = require("path"); // Module for working with file paths
+var FormData = require('form-data');
 const { ethers } = require("ethers"); // Ethereum JavaScript library
 const { validationResult } = require("express-validator");
+const readXlsxFile = require("read-excel-file/node");
+const { parse } = require("csv-parse");
 // Import custom cryptoFunction module for encryption and decryption
 const { decryptData, generateEncryptedUrl } = require("../common/cryptoFunction");
+// Import MongoDB models
+const { Issues, BatchIssues, DynamicIssues, DynamicBatchIssues } = require("../config/schema");
 
 const pdf = require("pdf-lib"); // Library for creating and modifying PDF documents
 const { PDFDocument } = pdf;
@@ -25,14 +30,17 @@ const {
   holdExecution,
   checkTransactionStatus,
   renameUploadPdfFile,
-  wipeSourceFile
+  wipeSourceFile,
+  verificationWithDatabase,
+  connectToStandby
 } = require('../model/tasks'); // Importing functions from the '../model/tasks' module
 
 var messageCode = require("../common/codes");
-const e = require('express');
 const uploadsPath = path.join(__dirname, '../../uploads');
 
 const urlLimit = process.env.MAX_URL_SIZE || 50;
+const manualLimit = process.env.MANUAL_LIMIT || 100;
+const excelLimit = process.env.EXCEL_LIMIT || 1000;
 
 /**
  * Verify Certification page with PDF QR - Blockchain URL.
@@ -49,15 +57,7 @@ const verify = async (req, res) => {
   var certificateS3Url;
   var responseUrl;
   var verificationResponse;
-  // Get today's date
-  const getTodayDate = async () => {
-    const today = new Date();
-    const month = String(today.getMonth() + 1).padStart(2, '0'); // Add leading zero if month is less than 10
-    const day = String(today.getDate()).padStart(2, '0'); // Add leading zero if day is less than 10
-    const year = today.getFullYear();
-    return `${month}/${day}/${year}`;
-  };
-  const todayDate = await getTodayDate();
+
   // Rename the file by replacing the original file path with the new file name
   const newFilePath = await renameUploadPdfFile(file);
   if (newFilePath) {
@@ -79,7 +79,7 @@ const verify = async (req, res) => {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertNotValid });
     }
 
-    if (certificateData.startsWith(process.env.START_URL) || certificateData.startsWith(process.env.START_VERIFY_URL)) {
+    if (certificateData.startsWith(process.env.START_VERIFY_URL)) {
       var urlSize = certificateData.length;
       if (urlSize < urlLimit) {
         // Parse the URL
@@ -393,10 +393,10 @@ const decodeQRScan = async (req, res) => {
               "Polygon URL": `${process.env.NETWORK}/tx/${isDynamicCertificateExist.transactionHash}`,
               "type": isDynamicCertificateExist.type,
               "url": originalUrl,
-              "certificateUrl" : isDynamicCertificateExist.url
+              "certificateUrl": isDynamicCertificateExist.url
             }
 
-            if(isDynamicCertificateExist.certificateStatus == 3){
+            if (isDynamicCertificateExist.certificateStatus == 3) {
               return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertRevoked });
             }
 
@@ -688,7 +688,7 @@ const verifyCertificationId = async (req, res) => {
         if (inputFileExist) {
         }
 
-        if(isDynamicCertificateExist.certificateStatus == 3){
+        if (isDynamicCertificateExist.certificateStatus == 3) {
           return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgCertRevoked });
         }
 
@@ -709,10 +709,340 @@ const verifyCertificationId = async (req, res) => {
   }
 };
 
+/**
+ * Verify Certification page with PDF QR / Excel  - Blockchain URL.
+ *
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
+const verifyBatch = async (req, res) => {
+  // Extracting file path from the request
+  var file = req?.file.path;
+  var _manual = parseInt(req?.body.json) || 0;
+  const manual = _manual == 0 ? 0 : 1;
+  console.log("file name with extension", req.file.originalname);
+  // Extract the file extension
+  const fileExtension = path.extname(req.file.originalname);
+  let _columnIndex = parseInt(req.body.column) || 1;
+  const columnIndex = _columnIndex > 0 ? _columnIndex - 1 : 0;
+  var verificationResponse = {
+    code: 400,
+    status: "FAILED",
+    message: messageCode.msgCertNotValid
+  };
+
+  const acceptableFormats = [
+    '.pdf',
+    '.xlx',
+    '.xlsx',
+    '.csv',
+    '.json'
+  ];
+
+  if (fileExtension == acceptableFormats[4] && manual == 1) {
+    const fileContent = fs.readFileSync(file, 'utf8'); // Read the file synchronously
+    const jsonData = JSON.parse(fileContent); // Parse the JSON data
+    const verificationStatus = [
+      "invalid",
+      "valid",
+      'NA',
+      "revoked",
+    ];
+    if (!Array.isArray(jsonData)) {
+      res.status(400).json(verificationResponse);
+      console.error('JSON data is not an array.');
+      await wipeSourceFile(req.file.path);
+      return;
+    }
+    // Extract and log certificationID line by line
+    const certificationIDs = [];
+    const validCertStatus = [];
+    jsonData.forEach((item, index) => {
+      if (item.certificationID) {
+        certificationIDs.push(item.certificationID);
+      }
+    });
+
+    if (certificationIDs.length > 0 && certificationIDs.length > manualLimit) {
+      await wipeSourceFile(req.file.path);
+      return res.status(400).json({
+        code: 400,
+        status: "FAILED",
+        message: `${messageCode.msgExcelLimit}: ${manualLimit}`,
+        details: `Input Records : ${certificationIDs.length}`
+      });
+    }
+
+    for (const id of certificationIDs) {
+      const validStatus = await verificationWithDatabase(id);
+      validCertStatus.push(validStatus);
+    }
+
+    // Initialize counts array with zeros, same length as verificationStatus
+    const counts = new Array(verificationStatus.length).fill(0);
+    // Count occurrences
+    validCertStatus.forEach(index => {
+      counts[index]++;
+    });
+
+    if (validCertStatus.length > 0) {
+      // Map the data2 values to the corresponding verificationStatus based on the index
+      const mergedStatus = certificationIDs.map((id, index) => {
+        const statusIndex = validCertStatus[index]; // Convert to 0-based index
+        const status = verificationStatus[statusIndex] || "NA"; // Handle out-of-range indices
+        return { id, status };
+      });
+      await wipeSourceFile(req.file.path);
+      return res.status(200).json({
+        code: 200,
+        status: "SUCCESS",
+        message: messageCode.msgBatchVerification,
+        details: mergedStatus,
+        total: certificationIDs.length,
+        valid: counts[1],
+        invalid: counts[0],
+        revoked: counts[3]
+      });
+    }
+  }
+
+  if (fileExtension != acceptableFormats[0] && fileExtension != acceptableFormats[1] && fileExtension != acceptableFormats[2] && fileExtension != acceptableFormats[3]) {
+    await wipeSourceFile(req.file.path);
+    return res.status(400).json({
+      code: 400,
+      status: "FAILED",
+      message: messageCode.msgInvalidFileFormat
+    });
+  }
+
+  try {
+    if (fileExtension == acceptableFormats[0]) { // file has .pdf extension
+
+      // const port = process.env.PORT;
+      // const hostUrl = `${host}:${port}/`;
+
+      // // Extract the body from the incoming request
+      // const requestFile = req?.file;
+
+      // const formData = new FormData();
+      // // If file is stored on disk
+      // const fileBuffer = fs.readFileSync(requestFile.path);
+
+      // formData.append("pdfFile", fileBuffer, {
+      //   filename: requestFile.originalname,
+      //   contentType: requestFile.mimetype,
+      // });
+
+      // // Call the external API, passing the request body
+      // const response = await fetch(`${hostUrl}api/verify`, {
+      //   method: 'POST', // Use POST for a body
+      //   body: formData // Convert the body to JSON string
+      // });
+
+      // if(!response){
+      //   return res.status(400).json({
+      //     code: 400,
+      //     status: "FAILED",
+      //     message: messageCode.msgInternalError,
+      //     details: error
+      //   });
+      // }
+      // const result = await response.json();
+      // // console.log("Response from verify API:", result);
+      // await wipeSourceFile(req.file.path);
+      // return res.status(result.code).json({
+      //   code: result.code,
+      //   status: result.status,
+      //   message: result.message,
+      //   details: result.details
+      // });
+
+      // Rename the file by replacing the original file path with the new file name
+      var fileBuffer = fs.readFileSync(file);
+      var pdfDoc = await PDFDocument.load(fileBuffer);
+      var blockchainResponse;
+      var verificationResponse;
+      var responseCode = 200;
+      var responseStatus = 'SUCCESS';
+      var messageResponse = messageCode.msgCertValid;
+
+      const newFilePath = await renameUploadPdfFile(file);
+      if (newFilePath) {
+        // Update req.file.path to reflect the new file path
+        req.file.path = newFilePath;
+      }
+
+      if (pdfDoc.getPageCount() > 1) {
+        await wipeSourceFile(req.file.path);
+        return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgMultiPagePdf });
+      }
+
+      try {
+        // Extract QR code data from the PDF file
+        const certificateData = await extractQRCodeDataFromPDF(req.file.path);
+
+        if (!certificateData) {
+          res.status(400).json(verificationResponse);
+          await wipeSourceFile(req.file.path);
+          return;
+        }
+
+        if (certificateData.startsWith(process.env.START_VERIFY_URL)) {
+          // Parse the URL
+          const parsedUrl = new URL(certificateData);
+          // Extract the query parameter
+          const certificationNumber = parsedUrl.searchParams.get('');
+
+          // Validate with blockchain call
+          blockchainResponse = await verifySingleCertificationWithRetry(certificationNumber);
+
+          if (blockchainResponse != 0 && (blockchainResponse == 1 || blockchainResponse == 3)) {
+            if (blockchainResponse == 3) {
+              responseCode = 400;
+              responseStatus = 'FAILED';
+              messageResponse = messageCode.msgCertRevoked;
+            }
+            res.status(responseCode).json({ code: responseCode, status: responseStatus, message: messageResponse });
+            await wipeSourceFile(req.file.path);
+            return;
+          }
+
+          const verificationDatabase = await verificationWithDatabase(certificationNumber);
+          console.log("response res", verificationDatabase)
+
+          if (verificationDatabase != 0 && (verificationDatabase == 1 || verificationDatabase == 3)) {
+            if (verificationDatabase == 3) {
+              responseCode = 400;
+              responseStatus = 'FAILED';
+              messageResponse = messageCode.msgCertRevoked;
+            }
+            res.status(responseCode).json({ code: responseCode, status: responseStatus, message: messageResponse });
+            await wipeSourceFile(req.file.path);
+            return;
+          }
+
+          res.status(400).json(verificationResponse);
+          await wipeSourceFile(req.file.path);
+          return;
+
+        } else if (certificateData.startsWith(process.env.START_LMS)) {
+          var [extractQRData, encodedUrl] = await extractCertificateInfo(certificateData);
+          if (!extractQRData["Certificate Number"]) {
+            extractQRData = await extractCertificateInformation(certificateData);
+          }
+          if (extractQRData["Polygon URL"] == undefined) {
+            await wipeSourceFile(req.file.path);
+            return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
+          }
+          if (extractQRData) {
+            var verifyLog = {
+              issuerId: 'default',
+              course: extractQRData["Course Name"],
+            };
+            await verificationLogEntry(verifyLog);
+
+            await wipeSourceFile(req.file.path);
+            extractQRData["Polygon URL"] = await modifyPolygonURL(extractQRData["Polygon URL"]);
+            // Extract the transaction hash from the URL
+            let transactionHash = extractQRData["Polygon URL"].split('/').pop();
+            if (transactionHash) {
+              let txStatus = await checkTransactionStatus(transactionHash);
+              extractQRData.blockchainStatus = txStatus;
+            }
+            res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgCertValid, details: extractQRData });
+            await wipeSourceFile(req.file.path);
+            return;
+          }
+          await wipeSourceFile(req.file.path);
+          return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
+
+        } else {
+          await wipeSourceFile(req.file.path);
+          return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidCert });
+        }
+
+      } catch (error) {
+
+        res.status(400).json(verificationResponse);
+        await wipeSourceFile(req.file.path);
+        return;
+      }
+
+    } else if (fileExtension == acceptableFormats[1] || fileExtension == acceptableFormats[2]) {
+      const excelResponse = await handleCustomBatchExcel(req.file.path, columnIndex);
+      console.log("Excel response: ", excelResponse);
+      const statusCode = (excelResponse?.response) ? 200 : 400;
+      const excelStatus = excelResponse?.status;
+      const excelMessage = excelResponse?.message;
+      const excelDetails = excelResponse?.Details;
+      await wipeSourceFile(req.file.path);
+      if (statusCode == 200) {
+        return res.status(statusCode).json({
+          code: statusCode,
+          status: excelStatus,
+          message: excelMessage,
+          details: excelDetails,
+          total: excelResponse?.total,
+          valid: excelResponse?.valid,
+          invalid: excelResponse?.invalid,
+          revoked: excelResponse?.revoked
+        });
+      }
+      return res.status(statusCode).json({
+        code: statusCode,
+        status: excelStatus,
+        message: excelMessage,
+        details: excelDetails
+      });
+    } else if (fileExtension == acceptableFormats[3]) {
+      const csvResponse = await handleCustomBatchCsv(req.file.path, columnIndex);
+      console.log("CSV response: ", csvResponse);
+      const statusCode = (csvResponse?.response) ? 200 : 400;
+      const csvStatus = csvResponse?.status;
+      const csvMessage = csvResponse?.message;
+      const csvDetails = csvResponse?.Details;
+      await wipeSourceFile(req.file.path);
+      if (statusCode == 200) {
+        return res.status(statusCode).json({
+          code: statusCode,
+          status: statusCode,
+          message: csvMessage,
+          details: csvDetails,
+          total: csvResponse?.total,
+          valid: csvResponse?.valid,
+          invalid: csvResponse?.invalid,
+          revoked: csvResponse?.revoked
+        });
+      }
+      return res.status(statusCode).json({
+        code: statusCode,
+        status: csvStatus,
+        message: csvMessage,
+        details: csvDetails
+      });
+    } else {
+      await wipeSourceFile(req.file.path);
+      return res.status(400).json({
+        code: 400,
+        status: "FAILED",
+        message: messageCode.msgInvalidFile
+      });
+    }
+  } catch (error) {
+    await wipeSourceFile(req.file.path);
+    return res.status(500).json({
+      code: 500,
+      status: "FAILED",
+      message: messageCode.msgInternalError,
+      details: error
+    });
+  }
+};
+
 // Function to verify the ID (Single) with Smart Contract with Retry
 const verifySingleCertificationWithRetry = async (certificateId, retryCount = 3) => {
   const newContract = await connectToPolygon();
-  if(!newContract){
+  if (!newContract) {
     return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
   }
   try {
@@ -732,8 +1062,30 @@ const verifySingleCertificationWithRetry = async (certificateId, retryCount = 3)
         return 2;
       }
       return 1;
+    } else {
+      var standbyContract = await connectToStandby();
+      if (!standbyContract) {
+        return 0;
+      }
+      // Blockchain processing.
+      let verifyCert = await standbyContract.verifyCertificateById(certificateId);
+      let _certStatus = await standbyContract.getCertificateStatus(certificateId);
+
+      if (verifyCert) {
+        let verifyCertStatus = parseInt(verifyCert[3]);
+        if (_certStatus) {
+          let certStatus = parseInt(_certStatus);
+          if (certStatus == 3) {
+            return 3;
+          }
+        }
+        if (verifyCert[0] === false && verifyCertStatus == 5) {
+          return 2;
+        }
+        return 1;
+      }
+      return 0
     }
-    return 0;
   } catch (error) {
     if (retryCount > 0 && error.code === 'ETIMEDOUT') {
       console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);
@@ -754,8 +1106,8 @@ const verifySingleCertificationWithRetry = async (certificateId, retryCount = 3)
 // Function to verify the ID (Batch) with Smart Contract with Retry
 const verifyBatchCertificationWithRetry = async (batchNumber, dataHash, proof, hashProof, retryCount = 3) => {
   const newContract = await connectToPolygon();
-  if(!newContract){
-    return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+  if (!newContract) {
+    return 0;
   }
   try {
     // Blockchain processing.
@@ -773,8 +1125,29 @@ const verifyBatchCertificationWithRetry = async (batchNumber, dataHash, proof, h
         return 2;
       }
       return 1;
+    } else {
+      var standbyContract = await connectToStandby();
+      if (!standbyContract) {
+        return 0;
+      }
+      // Blockchain processing.
+      let batchVerifyResponse = await standbyContract.verifyBatchCertification(batchNumber, dataHash, proof);
+      let _responseStatus = await standbyContract.verifyCertificateInBatch(hashProof);
+      let responseStatus = parseInt(_responseStatus);
+      if (batchVerifyResponse) {
+        if (responseStatus) {
+          if (responseStatus == 3) {
+            return 3;
+          }
+        }
+        if (responseStatus == 5) {
+          return 2;
+        }
+        return 1;
+      }
+      return 0;
     }
-    return 0;
+
   } catch (error) {
     if (retryCount > 0 && error.code === 'ETIMEDOUT') {
       console.log(`Connection timed out. Retrying... Attempts left: ${retryCount}`);
@@ -812,9 +1185,264 @@ const hasFilesInDirectory = async (directoryPath) => {
   }
 }
 
+// Function to handle custom Batch Excel
+const handleCustomBatchExcel = async (_path, _index) => {
+  const verificationStatus = [
+    "invalid",
+    "valid",
+    'NA',
+    "revoked",
+  ];
+
+  if (!_path) {
+    return { status: "FAILED", response: false, message: "Failed to provide excel file" };
+  }
+  // api to fetch excel data into json
+  const newPath = path.join(..._path.split("\\"));
+  try {
+    // api to fetch excel data into json
+    const rows = await readXlsxFile(newPath);
+    const targetColumn = rows
+      .map(row => row[_index])
+      .filter(value => value !== null); // Remove null values
+
+    const allUndefined = targetColumn.every(item => item === undefined);
+    // console.log("Excel request: ", allUndefined, rows, targetColumn, targetColumn.length, _index);
+
+    if (allUndefined) {
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgNoIdsFound,
+      };
+    }
+
+    if (targetColumn.length > 1) {
+
+      // Batch Certification Formated Details
+      var notNullCertificationIDs = targetColumn.slice(1);
+
+
+      // Initialize an empty list to store matching IDs
+      const validChainResponse = [];
+      const validCertStatus = [];
+
+      // Assuming verify Issues is from blockchain
+      // for (const certId of notNullCertificationIDs) {
+      //   var validCertStatus = await verifySingleCertificationWithRetry(certId);
+      //   validChainResponse.push(validCertStatus);
+      // }
+      if (notNullCertificationIDs.length > excelLimit) {
+        return {
+          status: "FAILED",
+          response: false,
+          message: `${messageCode.msgExcelLimit}: ${excelLimit}`,
+          Details: `Input Records : ${notNullCertificationIDs.length}`,
+        };
+      }
+
+      // Assuming Issues is your MongoDB model
+      for (const id of notNullCertificationIDs) {
+        const validStatus = await verificationWithDatabase(id);
+        validCertStatus.push(validStatus);
+      }
+
+      // Initialize counts array with zeros, same length as verificationStatus
+      const counts = new Array(verificationStatus.length).fill(0);
+      // Count occurrences
+      validCertStatus.forEach(index => {
+        counts[index]++;
+      });
+
+      if (validCertStatus.length > 0) {
+
+        // Map the data2 values to the corresponding verificationStatus based on the index
+        const mergedStatus = notNullCertificationIDs.map((id, index) => {
+          const statusIndex = validCertStatus[index]; // Convert to 0-based index
+          const status = verificationStatus[statusIndex] || "NA"; // Handle out-of-range indices
+          return { id, status };
+        });
+
+        // console.log("The extracted data ", notNullCertificationIDs, validCertStatus, mergedStatus);
+        return {
+          status: "SUCCESS",
+          response: true,
+          message: messageCode.msgBatchVerification,
+          Details: mergedStatus,
+          total: notNullCertificationIDs.length,
+          valid: counts[1],
+          invalid: counts[0],
+          revoked: counts[3]
+        };
+
+      }
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgExcelHasExistingIds,
+        Details: [notNullCertificationIDs],
+      };
+    } else {
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgNoIdsFound,
+      };
+    }
+
+  } catch (error) {
+    console.error("Error fetching record:", error);
+    return {
+      status: "FAILED",
+      response: false,
+      message: messageCode.msgProvideValidExcel,
+    };
+  }
+};
+
+// Function to handle custom Batch CSV
+const handleCustomBatchCsv = async (_path, _index) => {
+  const verificationStatus = [
+    "invalid",
+    "valid",
+    'NA',
+    "revoked",
+  ];
+
+  if (!_path) {
+    return { status: "FAILED", response: false, message: "Failed to provide excel file" };
+  }
+  // api to fetch excel data into json
+  const newPath = path.join(..._path.split("\\"));
+  try {
+    const rows = []
+    // Create a read stream and pipe it to csv-parse
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(newPath)
+        .pipe(
+          parse({
+            skip_empty_lines: true, // Ignore empty lines
+          })
+        )
+        .on("data", (row) => {
+          rows.push(row); // Add each row (as an array) to the rows array
+        })
+        .on("end", resolve)
+        .on("error", reject);
+    });
+
+    // Extract the target column based on the given index
+    const targetColumn = rows
+      .map((row) => row[_index]) // Extract the column at _index
+      .filter((value) => value !== null && value !== ''); // Remove null/undefined values
+    if (targetColumn.length == 0) {
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgNoIndexColumnFound,
+      };
+    }
+    // const allUndefined = targetColumn.every(item => item === undefined);
+    // console.log("CSV request: ", allUndefined, rows, targetColumn, targetColumn.length, _index);
+
+    // if (allUndefined) {
+    //   return {
+    //     status: "FAILED",
+    //     response: false,
+    //     message: messageCode.msgNoIdsFound,
+    //   };
+    // }
+
+    if (targetColumn.length > 1) {
+
+      // Batch Certification Formated Details
+      var notNullCertificationIDs = targetColumn.slice(1);
+
+      // Initialize an empty list to store matching IDs
+      const validChainResponse = [];
+      const validCertStatus = [];
+
+      // Assuming verify Issues is from blockchain
+      // for (const certId of notNullCertificationIDs) {
+      //   var validCertStatus = await verifySingleCertificationWithRetry(certId);
+      //   validChainResponse.push(validCertStatus);
+      // }
+
+      // Limit Records to certain limit in the Batch
+      if (notNullCertificationIDs.length > excelLimit) {
+        return {
+          status: "FAILED",
+          response: false,
+          message: `${messageCode.msgExcelLimit}: ${excelLimit}`,
+          Details: `Input Records : ${notNullCertificationIDs.length}`,
+        };
+      }
+
+      // Assuming Issues is your MongoDB model
+      for (const id of notNullCertificationIDs) {
+        const validStatus = await verificationWithDatabase(id);
+        validCertStatus.push(validStatus);
+      }
+
+      // Initialize counts array with zeros, same length as verificationStatus
+      const counts = new Array(verificationStatus.length).fill(0);
+      // Count occurrences
+      validCertStatus.forEach(index => {
+        counts[index]++;
+      });
+
+      if (validCertStatus.length > 0) {
+
+        // Map the data2 values to the corresponding verificationStatus based on the index
+        const mergedStatus = notNullCertificationIDs.map((id, index) => {
+          const statusIndex = validCertStatus[index]; // Convert to 0-based index
+          const status = verificationStatus[statusIndex] || "NA"; // Handle out-of-range indices
+          return { id, status };
+        });
+
+        // console.log("The extracted data ", notNullCertificationIDs, validCertStatus, mergedStatus);
+        return {
+          status: "SUCCESS",
+          response: true,
+          message: messageCode.msgBatchVerification,
+          Details: mergedStatus,
+          total: notNullCertificationIDs.length,
+          valid: counts[1],
+          invalid: counts[0],
+          revoked: counts[3]
+        };
+
+      }
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgExcelHasExistingIds,
+        Details: [notNullCertificationIDs],
+      };
+    } else {
+      return {
+        status: "FAILED",
+        response: false,
+        message: messageCode.msgNoIdsFound,
+      };
+    }
+
+  } catch (error) {
+    console.error("Error fetching record:", error);
+    return {
+      status: "FAILED",
+      response: false,
+      message: messageCode.msgProvideValidExcel,
+    };
+  }
+};
+
 module.exports = {
   // Function to verify a certificate with a PDF QR code
   verify,
+
+  // Function to verify Certification page with PDF QR / Zip / Excel
+  verifyBatch,
 
   // Function to verify a Single/Batch certification with an ID
   verifyCertificationId,
@@ -823,5 +1451,7 @@ module.exports = {
   decodeCertificate,
 
   // Function to verify a certificate with a Scanned Short url/Original url based QR code
-  decodeQRScan
+  decodeQRScan,
+
+  verifySingleCertificationWithRetry
 };

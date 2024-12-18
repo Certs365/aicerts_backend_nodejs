@@ -423,7 +423,7 @@ const generateExcelReport = async (req, res) => {
             }
         }
     } catch (error) {
-        res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
+        res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgInternalError, details: error });
         return;
     }
 

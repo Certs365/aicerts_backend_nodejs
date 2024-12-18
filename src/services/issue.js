@@ -28,7 +28,9 @@ const {
   fallbackProvider,
   isValidIssuer,
   connectToPolygon,
+  connectToStandby,
   connectToPolygonIssue,
+  connectToStandbyIssue,
   convertDateFormat,
   convertDateToEpoch,
   convertEpochToDate,
@@ -69,16 +71,14 @@ const {
 const contractAddress = process.env.CONTRACT_ADDRESS;
 
 // Parse environment variables for password length constraints
-const min_length = parseInt(process.env.MIN_LENGTH);
-const max_length = parseInt(process.env.MAX_LENGTH);
+const min_length = 6;
+const max_length = 50;
 
 const messageCode = require("../common/codes");
 const {
   waitForJobsToComplete,
   cleanUpJobs,
   addJobsInChunks,
-  getGlobalDataforQueue,
-  setGlobalDataforQueue,
 } = require("../queue_service/queueUtils");
 const {
   processBulkIssueJob,
@@ -92,11 +92,12 @@ const handleIssueCertification = async (
   _grantDate,
   _expirationDate
 ) => {
-  const newContract = await connectToPolygon();
+  // const newContract = await connectToPolygon();
   var qrOption = 0;
-  if (!newContract) {
-    return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
-  }
+  var newContract;
+  // if (!newContract) {
+  //   return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+  // }
   const grantDate = await convertDateFormat(_grantDate);
   const expirationDate = await convertDateFormat(_expirationDate);
   // Get today's date
@@ -200,6 +201,17 @@ const handleIssueCertification = async (
           };
         }
       }
+
+      const blockchainPreference = (!idExist.blockchainPreference || idExist.blockchainPreference == 0) ? 0 : 1;
+      if (blockchainPreference == 0) {
+        newContract = await connectToPolygon();
+      } else {
+        newContract = await connectToStandby();
+      }
+      if (!newContract) {
+        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+      }
+
       try {
         // Prepare fields for the certificate
         const fields = {
@@ -217,7 +229,12 @@ const handleIssueCertification = async (
         const combinedHash = calculateHash(JSON.stringify(hashedFields));
 
         try {
-          const contractAddress = process.env.CONTRACT_ADDRESS;
+          var contractAddress;
+          if (blockchainPreference == 0) {
+            contractAddress = process.env.CONTRACT_ADDRESS;
+          } else {
+            contractAddress = process.env.STANDBY_CONTRACT_ADDRESS;
+          }
           let getContractStatus = await getContractAddress(contractAddress);
           if (!getContractStatus) {
             return {
@@ -277,6 +294,7 @@ const handleIssueCertification = async (
             };
           } else {
             var { txHash, txFee } = await issueCertificateWithRetry(
+              blockchainPreference,
               certificateNumber,
               combinedHash,
               epochExpiration
@@ -290,7 +308,12 @@ const handleIssueCertification = async (
               };
             }
 
-            var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+            var polygonLink;
+            if (blockchainPreference == 0) {
+              polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+            } else {
+              polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+            }
 
             // Generate encrypted URL with certificate data
             const dataWithLink = { ...fields, polygonLink: polygonLink };
@@ -366,6 +389,7 @@ const handleIssueCertification = async (
                 width: withoutPdfWidth,
                 height: withoutPdfHeight,
                 qrOption: qrOption,
+                blockchainOption: blockchainPreference,
                 type: "withoutpdf",
               };
               // Insert certificate data into database
@@ -433,10 +457,11 @@ const handleIssuance = async (
   _expirationDate,
   flag
 ) => {
-  const newContract = await connectToPolygon();
-  if (!newContract) {
-    return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
-  }
+  // const newContract = await connectToPolygon();
+  // if (!newContract) {
+  //   return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+  // }
+  var newContract;
   const issueFlag = flag;
   var getTxHash = null;
   var getTxFee = null;
@@ -556,6 +581,17 @@ const handleIssuance = async (
         details: moreDetails,
       };
     } else {
+
+      const blockchainPreference = (!idExist.blockchainPreference || idExist.blockchainPreference == 0) ? 0 : 0;
+      if (blockchainPreference == 0) {
+        newContract = await connectToPolygon();
+      } else {
+        newContract = await connectToStandby();
+      }
+      if (!newContract) {
+        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+      }
+
       try {
         // Prepare fields for the certificate
         const fields = {
@@ -602,6 +638,7 @@ const handleIssuance = async (
           var epochExpiration =
             expirationDate != 1 ? await convertDateToEpoch(expirationDate) : 1;
           var transactionResponse = await issueCustomCertificateWithRetry(
+            blockchainPreference,
             fields.Certificate_Number,
             combinedHash,
             epochExpiration
@@ -658,6 +695,7 @@ const handleIssuance = async (
                   );
                 }
                 transactionResponse = await issueCustomCertificateWithRetry(
+                  blockchainPreference,
                   fields.Certificate_Number,
                   combinedHash,
                   epochExpiration
@@ -686,7 +724,13 @@ const handleIssuance = async (
               message: messageCode.msgFailedOpsAtBlockchain,
             };
           }
-          const polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+          // const polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+          var polygonLink;
+          if (blockchainPreference == 0) {
+            polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+          } else {
+            polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+          }
           // Generate encrypted URL with certificate data
           const dataWithLink = { ...fields, polygonLink: polygonLink };
           const urlLink = generateEncryptedUrl(dataWithLink);
@@ -721,6 +765,7 @@ const handleIssuance = async (
               course: fields.courseName,
               grantDate: fields.Grant_Date,
               expirationDate: fields.Expiration_Date,
+              blockchainOption: blockchainPreference || 0,
             };
 
             // Insert certificate data into database
@@ -789,11 +834,11 @@ const handleIssuePdfCertification = async (
   _expirationDate,
   _pdfPath
 ) => {
-  const newContract = await connectToPolygon();
+  // const newContract = await connectToPolygon();
   var qrOption = 0;
-  if (!newContract) {
-    return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
-  }
+  // if (!newContract) {
+  //   return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+  // }
   const pdfPath = _pdfPath;
   const grantDate = await convertDateFormat(_grantDate);
   const expirationDate = await convertDateFormat(_expirationDate);
@@ -909,6 +954,17 @@ const handleIssuePdfCertification = async (
           };
         }
       }
+
+      const blockchainPreference = (!idExist.blockchainPreference || idExist.blockchainPreference == 0) ? 0 : 1;
+      if (blockchainPreference == 0) {
+        newContract = await connectToPolygon();
+      } else {
+        newContract = await connectToStandby();
+      }
+      if (!newContract) {
+        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+      }
+
       // If validation passes, proceed with certificate issuance
       const fields = {
         Certificate_Number: certificateNumber,
@@ -924,6 +980,12 @@ const handleIssuePdfCertification = async (
       const combinedHash = calculateHash(JSON.stringify(hashedFields));
 
       try {
+        var contractAddress;
+        if (blockchainPreference == 0) {
+          contractAddress = process.env.CONTRACT_ADDRESS;
+        } else {
+          contractAddress = process.env.STANDBY_CONTRACT_ADDRESS;
+        }
         let getContractStatus = await getContractAddress(contractAddress);
         if (!getContractStatus) {
           // Always delete the temporary file (if it exists)
@@ -999,10 +1061,13 @@ const handleIssuePdfCertification = async (
       }
 
       var { txHash, txFee } = await issueCertificateWithRetry(
+        blockchainPreference,
         certificateNumber,
         combinedHash,
         epochExpiration
       );
+      // var txHash = 'temporary hash';
+      // var txFee = 1.20;
       if (!txHash) {
         await wipeSourceFile(pdfPath);
         return {
@@ -1013,7 +1078,13 @@ const handleIssuePdfCertification = async (
         };
       }
 
-      var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+      // var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+      var polygonLink;
+      if (blockchainPreference == 0) {
+        polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+      } else {
+        polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+      }
 
       try {
         // Generate encrypted URL with certificate data
@@ -1138,6 +1209,7 @@ const handleIssuePdfCertification = async (
           width: width,
           height: height,
           qrOption: qrOption,
+          blockchainOption: blockchainPreference,
           url: imageUrl,
           type: "withpdf",
         };
@@ -1186,11 +1258,11 @@ const handleIssueDynamicPdfCertification = async (
   _positionY,
   _qrsize
 ) => {
-  const newContract = await connectToPolygon();
+  // const newContract = await connectToPolygon();
   var qrOption = 0;
-  if (!newContract) {
-    return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
-  }
+  // if (!newContract) {
+  //   return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+  // }
   const pdfPath = _pdfPath;
   try {
     await isDBConnected();
@@ -1266,6 +1338,16 @@ const handleIssueDynamicPdfCertification = async (
         details: moreDetails,
       };
     } else {
+
+      const blockchainPreference = (!idExist.blockchainPreference || idExist.blockchainPreference == 0) ? 0 : 1;
+      if (blockchainPreference == 0) {
+        newContract = await connectToPolygon();
+      } else {
+        newContract = await connectToStandby();
+      }
+      if (!newContract) {
+        return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+      }
       // If validation passes, proceed with certificate issuance
       const fields = {
         Certificate_Number: certificateNumber,
@@ -1279,6 +1361,12 @@ const handleIssueDynamicPdfCertification = async (
       const combinedHash = calculateHash(JSON.stringify(hashedFields));
 
       try {
+        var contractAddress;
+        if (blockchainPreference == 0) {
+          contractAddress = process.env.CONTRACT_ADDRESS;
+        } else {
+          contractAddress = process.env.STANDBY_CONTRACT_ADDRESS;
+        }
         let getContractStatus = await getContractAddress(contractAddress);
         if (!getContractStatus) {
           await wipeSourceFile(pdfPath);
@@ -1353,6 +1441,7 @@ const handleIssueDynamicPdfCertification = async (
       }
 
       var { txHash, txFee } = await issueCertificateWithRetry(
+        blockchainPreference,
         certificateNumber,
         combinedHash,
         1
@@ -1367,7 +1456,13 @@ const handleIssueDynamicPdfCertification = async (
         };
       }
 
-      var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+      // var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+      var polygonLink;
+      if (blockchainPreference == 0) {
+        polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+      } else {
+        polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+      }
 
       try {
         // Generate encrypted URL with certificate data
@@ -1484,6 +1579,7 @@ const handleIssueDynamicPdfCertification = async (
           width: width,
           height: height,
           qrOption: qrOption,
+          blockchainOption: blockchainPreference,
           url: imageUrl,
           customFields: _customFields,
         };
@@ -1535,11 +1631,11 @@ const handleIssueDynamicCertification = async (
   _positionY,
   _qrsize
 ) => {
-  const newContract = await connectToPolygon();
+  // const newContract = await connectToPolygon();
   var qrOption = 0;
-  if (!newContract) {
-    return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
-  }
+  // if (!newContract) {
+  //   return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+  // }
   const pdfPath = _pdfPath;
   const grantDate = await convertDateFormat(_grantDate);
   const expirationDate = await convertDateFormat(_expirationDate);
@@ -1646,6 +1742,12 @@ const handleIssueDynamicCertification = async (
         details: moreDetails,
       };
     } else {
+      const blockchainPreference = (!idExist.blockchainPreference || idExist.blockchainPreference == 0) ? 0 : 1;
+      if (blockchainPreference == 0) {
+        newContract = await connectToPolygon();
+      } else {
+        newContract = await connectToStandby();
+      }
       // If validation passes, proceed with certificate issuance
       const fields = {
         Certificate_Number: certificateNumber,
@@ -1661,6 +1763,12 @@ const handleIssueDynamicCertification = async (
       const combinedHash = calculateHash(JSON.stringify(hashedFields));
 
       try {
+        var contractAddress;
+        if (blockchainPreference == 0) {
+          contractAddress = process.env.CONTRACT_ADDRESS;
+        } else {
+          contractAddress = process.env.STANDBY_CONTRACT_ADDRESS;
+        }
         let getContractStatus = await getContractAddress(contractAddress);
         if (!getContractStatus) {
           await wipeSourceFile(pdfPath);
@@ -1735,6 +1843,7 @@ const handleIssueDynamicCertification = async (
       }
 
       var { txHash, txFee } = await issueCertificateWithRetry(
+        blockchainPreference,
         certificateNumber,
         combinedHash,
         epochExpiration
@@ -1749,7 +1858,13 @@ const handleIssueDynamicCertification = async (
         };
       }
 
-      var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+      // var polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+      var polygonLink;
+      if (blockchainPreference == 0) {
+        polygonLink = `https://${process.env.NETWORK}/tx/${txHash}`;
+      } else {
+        polygonLink = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+      }
 
       try {
         // Generate encrypted URL with certificate data
@@ -1873,6 +1988,7 @@ const handleIssueDynamicCertification = async (
           width: width,
           height: height,
           qrOption: qrOption,
+          blockchainOption: blockchainPreference,
           url: imageUrl,
           type: "withpdf",
         };
@@ -1927,10 +2043,11 @@ const dynamicBulkCertificates = async (
   customFolder,
   flag
 ) => {
-  const newContract = await connectToPolygon();
-  if (!newContract) {
-    return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
-  }
+  // const newContract = await connectToPolygon();
+  // if (!newContract) {
+  //   return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+  // }
+  const idExist = await User.findOne({ email: email });
   // console.log("Batch inputs", _pdfReponse, excelFilePath);
   const pdfResponse = _pdfReponse;
   const excelResponse = _excelResponse[0];
@@ -1991,6 +2108,13 @@ const dynamicBulkCertificates = async (
       let tree = StandardMerkleTree.of(values, ["string"]);
       let batchExpiration = 1;
 
+      const blockchainPreference = (!idExist.blockchainPreference || idExist.blockchainPreference == 0) ? 0 : 1;
+      var contractAddress;
+      if (blockchainPreference == 0) {
+        contractAddress = process.env.CONTRACT_ADDRESS;
+      } else {
+        contractAddress = process.env.STANDBY_CONTRACT_ADDRESS;
+      }
       let getContractStatus = await getContractAddress(contractAddress);
       if (!getContractStatus) {
         return {
@@ -2001,10 +2125,12 @@ const dynamicBulkCertificates = async (
         };
       }
 
-      var batchNumber = await newContract.getRootLength();
-      var allocateBatchId = parseInt(batchNumber) + 1;
+      const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1;
+      idExist.batchSequence = allocateBatchId;
+      await idExist.save();
 
       var { txHash, txFee } = await issueBatchCertificateWithRetry(
+        blockchainPreference,
         tree.root,
         batchExpiration
       );
@@ -2175,6 +2301,7 @@ const dynamicBulkCertificates = async (
               width: pdfWidth,
               height: pdfHeight,
               qrOption: qrOption,
+              blockchainOption: blockchainPreference,
               url: imageUrl,
             };
             // await insertCertificateData(certificateData);
@@ -2282,7 +2409,7 @@ const processListener = async (job) => {
     }
 
     // Return the result if successful
-    return { URLS: result.URLS, queueId:result.queueId  };
+    return { URLS: result.URLS, queueId: result.queueId };
   } catch (error) {
     // Handle errors
     throw new Error(`${error.message} ${error.details || ""}`);
@@ -2304,19 +2431,14 @@ const dynamicBatchCertificates = async (
   customFolder,
   flag
 ) => {
-  const newContract = await connectToPolygon();
-  if (!newContract) {
-    return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
-  }
+  // const newContract = await connectToPolygon();
+  // if (!newContract) {
+  //   return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
+  // }
+  const idExist = await User.findOne({ email: email });
   // console.log("Batch inputs", _pdfReponse, excelFilePath);
   const pdfResponse = _pdfReponse;
   const excelResponse = _excelResponse[0];
-  // var insertPromises = []; // Array to hold all insert promises
-  // var insertUrl = [];
-  // var shortUrlStatus = false;
-  // var modifiedUrl;
-  // var imageUrl;
-  // var customFields;
 
   if (!pdfResponse || pdfResponse.length == 0) {
     return {
@@ -2325,7 +2447,6 @@ const dynamicBatchCertificates = async (
       message: messageCode.msgUnableToFindPdfFiles,
     };
   }
-
   try {
     // Check if the directory exists, if not, create it
     const destDirectory = path.join(__dirname, "../../uploads/", customFolder, "completed");
@@ -2364,14 +2485,21 @@ const dynamicBatchCertificates = async (
     // Format as arrays with corresponding elements using a loop
     values = hashedBatchData.map((hash) => [hash]);
 
-   try {
+    try {
       // Generate the Merkle tree
       let tree = StandardMerkleTree.of(values, ["string"]);
       const serializedTree = JSON.stringify(tree.dump());
       let batchExpiration = 1;
-
+      const blockchainPreference = (!idExist.blockchainPreference || idExist.blockchainPreference == 0) ? 0 : 1;
+      var contractAddress;
+      if (blockchainPreference == 0) {
+        contractAddress = process.env.CONTRACT_ADDRESS;
+      } else {
+        contractAddress = process.env.STANDBY_CONTRACT_ADDRESS;
+      }
       let getContractStatus = await getContractAddress(contractAddress);
       if (!getContractStatus) {
+        await wipeSourceFolder(customFolder);
         return {
           code: 400,
           status: "FAILED",
@@ -2380,14 +2508,17 @@ const dynamicBatchCertificates = async (
         };
       }
 
-      var batchNumber = await newContract.getRootLength();
-      var allocateBatchId = parseInt(batchNumber) + 1;
+      const allocateBatchId = idExist.batchSequence ? idExist.batchSequence + 1 : 1;
+      idExist.batchSequence = allocateBatchId;
+      await idExist.save();
 
       var { txHash, txFee } = await issueBatchCertificateWithRetry(
+        blockchainPreference,
         tree.root,
         batchExpiration
       );
       if (!txHash) {
+        await wipeSourceFolder(customFolder);
         return {
           code: 400,
           status: false,
@@ -2395,7 +2526,13 @@ const dynamicBatchCertificates = async (
         };
       }
 
-      var linkUrl = `https://${process.env.NETWORK}/tx/${txHash}`;
+      var linkUrl;
+      if (blockchainPreference == 0) {
+        linkUrl = `https://${process.env.NETWORK}/tx/${txHash}`;
+      } else {
+        linkUrl = `https://${process.env.STANDBY_NETWORK}/tx/${txHash}`;
+      }
+      var blockchainOption = blockchainPreference;
 
       if (pdfResponse.length == _excelResponse[1]) {
         console.log("working directory", __dirname);
@@ -2422,28 +2559,7 @@ const dynamicBatchCertificates = async (
 
         const bulkIssueQueue = new Queue(queueName, redisConfig);
 
-        // setGlobalDataforQueue({
-        //   pdfWidth,
-        //   pdfHeight,
-        //   linkUrl,
-        //   qrside,
-        //   posx,
-        //   posy,
-        //   excelResponse,
-        //   hashedBatchData,
-        //   serializedTree,
-        //   email,
-        //   issuerId,
-        //   allocateBatchId,
-        //   txHash,
-        //   bulkIssueStatus,
-        //   customFolder,
-        //   flag,
-        //   qrOption,
-        // })
-
-
-        const jobDataCallback = (chunk,queueId) => ({
+        const jobDataCallback = (chunk, queueId) => ({
           pdfResponse: chunk,
           pdfWidth,
           pdfHeight,
@@ -2462,7 +2578,8 @@ const dynamicBatchCertificates = async (
           customFolder,
           flag,
           qrOption,
-          queueId
+          blockchainOption,
+          queueId,
 
         });
         // Add jobs in chunks with custom job data
@@ -2472,12 +2589,12 @@ const dynamicBatchCertificates = async (
           chunkSize,
           queueId,
           jobDataCallback
-          
+
         );
         bulkIssueQueue.process(concurrency, processListener);
         let insertUrl;
         try {
-          insertUrl = await waitForJobsToComplete(jobs,queueId);
+          insertUrl = await waitForJobsToComplete(jobs, queueId);
           console.log("bulk issue queue processing completed");
         } catch (error) {
           return {
@@ -2496,26 +2613,6 @@ const dynamicBatchCertificates = async (
               message: "",
               Details: [],
             });
-            // console.log("finally done")
-            // setGlobalDataforQueue({
-            //   pdfWidth: null,
-            //   pdfHeight: null,
-            //   linkUrl: null,
-            //   qrside: null,
-            //   posx: null,
-            //   posy: null,
-            //   excelResponse: null,
-            //   hashedBatchData: null,
-            //   serializedTree: null,
-            //   email: null,
-            //   issuerId: null,
-            //   allocateBatchId: null,
-            //   txHash: null,
-            //   bulkIssueStatus: null,
-            //   customFolder: null,
-            //   flag: null,
-            //   qrOption: null,
-            // })
 
           } catch (error) {
             console.log("erro while deleting upload folder..", error.message)
@@ -2584,13 +2681,19 @@ const dynamicBatchCertificates = async (
 };
 
 const issueCustomCertificateWithRetry = async (
+  blockchainPreference,
   certificateNumber,
   certificateHash,
   expirationEpoch,
   retryCount = 3,
   gasPrice = null
 ) => {
-  const newContract = await connectToPolygonIssue();
+  var newContract;
+  if (blockchainPreference == 0) {
+    newContract = await connectToPolygonIssue();
+  } else {
+    newContract = await connectToStandbyIssue();
+  }
   if (!newContract) {
     return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
   }
@@ -2666,6 +2769,7 @@ const issueCustomCertificateWithRetry = async (
         );
         await holdExecution(2000);
         return issueCustomCertificateWithRetry(
+          blockchainPreference,
           certificateNumber,
           certificateHash,
           expirationEpoch,
@@ -2688,6 +2792,7 @@ const issueCustomCertificateWithRetry = async (
         console.log("increasedGasPrice", increasedGasPrice);
         await holdExecution(2000);
         return issueCustomCertificateWithRetry(
+          blockchainPreference,
           certificateNumber,
           certificateHash,
           expirationEpoch,
@@ -2725,12 +2830,18 @@ const issueCustomCertificateWithRetry = async (
 };
 
 const issueCertificateWithRetry = async (
+  blockchainPreference,
   certificateNumber,
   certificateHash,
   expirationEpoch,
   retryCount = 3
 ) => {
-  const newContract = await connectToPolygonIssue();
+  var newContract;
+  if (blockchainPreference == 0) {
+    newContract = await connectToPolygonIssue();
+  } else {
+    newContract = await connectToStandbyIssue();
+  }
   if (!newContract) {
     return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
   }
@@ -2751,6 +2862,7 @@ const issueCertificateWithRetry = async (
         // Retry after a delay (e.g., 1.5 seconds)
         await holdExecution(1500);
         return issueCertificateWithRetry(
+          blockchainPreference,
           certificateNumber,
           certificateHash,
           expirationEpoch,
@@ -2770,6 +2882,7 @@ const issueCertificateWithRetry = async (
       // Retry after a delay (e.g., 1.5 seconds)
       await holdExecution(1500);
       return issueCertificateWithRetry(
+        blockchainPreference,
         certificateNumber,
         certificateHash,
         expirationEpoch,
@@ -2801,11 +2914,17 @@ const issueCertificateWithRetry = async (
 };
 
 const issueBatchCertificateWithRetry = async (
+  blockchainPreference,
   root,
   expirationEpoch,
   retryCount = 3
 ) => {
-  const newContract = await connectToPolygonIssue();
+  var newContract;
+  if (blockchainPreference == 0) {
+    newContract = await connectToPolygonIssue();
+  } else {
+    newContract = await connectToStandbyIssue();
+  }
   if (!newContract) {
     return { code: 400, status: "FAILED", message: messageCode.msgRpcFailed };
   }
@@ -2827,7 +2946,6 @@ const issueBatchCertificateWithRetry = async (
         return issueCertificateWithRetry(root, expirationEpoch, retryCount - 1);
       }
     }
-
     return {
       txHash: txHash,
       txFee: txFee,
@@ -2839,7 +2957,7 @@ const issueBatchCertificateWithRetry = async (
       );
       // Retry after a delay (e.g., 1.5 seconds)
       await holdExecution(1500);
-      return issueCertificateWithRetry(root, expirationEpoch, retryCount - 1);
+      return issueCertificateWithRetry(blockchainPreference, root, expirationEpoch, retryCount - 1);
     } else if (error.code === "NONCE_EXPIRED") {
       // Extract and handle the error reason
       // console.log("Error reason:", error.reason);

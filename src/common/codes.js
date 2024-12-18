@@ -13,10 +13,11 @@ module.exports = {
     msgPageNotFound: "Page not found",
     msgInternalError: "Unable to reach the server, Please try again...",
     msgWorkInProgress: "🚧 !⚠! Work In Porgress !⚠! 🚧",
+    msgEmailNote: "This is an automated email. Please do not reply directly to this message.",
 
     // Handle Excel File messages
     msgInvalidExcel: "Invalid Excel file, Please try again",
-    msgExcelLimit: "Application can support issue credentials maximum ",
+    msgExcelLimit: "Application can support to process credentials maximum ",
     msgInvalidCertIds: "Excel file has invalid credential IDs length (each: min 12 - max 25)",
     msgInvalidDocIds: "Input has invalid Document ID format (no special characters) / length (min 6 - max 50)",
     msgExcelRepetetionIds: "Excel file has repetition in credentail IDs",
@@ -29,6 +30,10 @@ module.exports = {
     msgExcelHasExistingIds: "Excel file has Existing Credential IDs",
     msgInvalidHeaders: "Invalid / missing headers in the Excel file.",
     msgExcelSheetname: "The Excel file Sheet name should be - Batch.",
+    msgVerifyExcelSheetname: "The Excel file Sheet name should be - Validation.",
+    msgNoIdsFound: "The Excel file has no records in the specified column for Validation.",
+    msgBatchVerification: "Batch verification completed",
+    msgNoIndexColumnFound: "The file has no records in the specified index value, Please check and try again.",
     msgMissingDetailsInExcel: "The Excel file has missing fields, Please fill all required fields and try again",
     msgFailedToIssueAfterRetry: "Failed to issue credential after retries. Please try again...",
     msgFailedToGrantRoleRetry: "Failed to Grant Role after retries. Please try again...",
@@ -54,6 +59,7 @@ module.exports = {
     msgUnableToConvert: "Unable to convert the file, please check file format data and upload again...",
     msgMultipagePdfError: "Multiple-page PDF documents are not allowed. Please try again with a valid single-page PDF",
     msgProvideValidExcel: "Excel file has invalid details, Please verify and try again...",
+    msgProvideValidCsv: "CSV file has invalid details, Please verify and try again...",
     msgNoHeaderSpecified: "Data entered without a corresponding header.",
 
 
@@ -190,6 +196,7 @@ module.exports = {
     msgInvalidCert: "Invalid Credential",
     msgCertRevoked: "Credential has revoked",
     msgCertExpired: "Credential has expired",
+    msgInvalidFileFormat: "Invalid file format (must be zip, excel, pdf), Please check and try again.",
 
     // Admin dashboard & Graph Analytics
     msgInvalidGraphInput: "Please provide valid Graph Input",
@@ -227,4 +234,15 @@ module.exports = {
     msgMaximumRange: "Maximum credits allocation must not exceed 100",
     msgExistedMaximum: "Issuer has over maximum credits limit already",
 
+    // Badges
+    msgMatchResultsFound: "Match results found.",
+    msgBadgeIssued: "Badge issued successfully",
+    msgBadgeIssuedAlready: "Badge issue existed, Please check the Certificate number and try again...",
+    msgBadgeCodeExist: "Badge code existed, Please try again with different code...",
+    msgInvalidBadge: "Not found / Badge code Invalid, Please try again with valid code...",
+    msgBadgeDeleted: "Badge deleted successfully",
+    msgBadgeNotDeleted: "Unable to delete the badge, Please try again with valid details...",
+    msgInvalidBatchJson: "Invalid JSON file data, Please check and try again",
+    msgSetChainToPolygon: "Please set the Blockchain Option to Ploygon, to perform this operation",
+    msgSetChainToStandby: "Please set the Blockchain Option to Non-Polygon, to perform this operation",
 };
