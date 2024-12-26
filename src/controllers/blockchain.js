@@ -118,11 +118,11 @@ const validateIssuer = async (req, res) => {
     });
   }
 
-  if(validationStatus == 2 && userExist.status == 3){
-    return res.status(400).json({ 
-      code: 400, 
-      status: "FAILED", 
-      message: messageCode.msgRejecetedAlready 
+  if (validationStatus == 2 && userExist.status == 3) {
+    return res.status(400).json({
+      code: 400,
+      status: "FAILED",
+      message: messageCode.msgRejecetedAlready
     });
   }
 
@@ -443,16 +443,12 @@ const checkBalance = async (req, res) => {
  * @param {Object} req - Express request object.
  * @param {Object} res - Express response object.
  */
-
 const createAndValidateIssuerIdUponLogin = async (req, res) => {
   let validResult = validationResult(req);
   if (!validResult.isEmpty()) {
     return res.status(422).json({ code: 422, status: "FAILED", message: messageCode.msgEnterInvalid, details: validResult.array() });
   }
-  const newContract = await connectToPolygon();
-  if (!newContract) {
-    return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
-  }
+  var newContract;
   const email = req.body.email;
   let attempts = 0;
   let getNewId = null;
@@ -482,6 +478,7 @@ const createAndValidateIssuerIdUponLogin = async (req, res) => {
       const lastElement = values[values.length - 1];
 
       var getIssuerId = 0;
+
       if (userExist.issuerId == undefined) {
         // Loop through each property in the data object
         for (const value of Object.values(lastElement)) {
@@ -506,6 +503,72 @@ const createAndValidateIssuerIdUponLogin = async (req, res) => {
 
           try {
             // Blockchain processing.
+            newContract = await connectToPolygon();
+            if (!newContract) {
+              return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+            }
+            let response = await newContract.hasRole(process.env.ISSUER_ROLE, getIssuerId);
+            if (!response) {
+              var { txHash, polygonLink } = await grantOrRevokeRoleWithRetry("grant", process.env.ISSUER_ROLE, getIssuerId);
+              if (!polygonLink || !txHash) {
+                return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgFailedToGrantRoleRetry });
+              }
+            }
+          } catch (error) {
+            return res.status(500).json({ code: 500, status: "FAILED", message: messageCode.msgFailedAtBlockchain, details: error });
+          }
+
+          creditsExist = await ServiceAccountQuotas.find({ issuerId: getIssuerId });
+          if (!creditsExist || creditsExist.length < statusCount) {
+            for (let count = 1; count < 5; count++) {
+              let serviceName = creditToServiceName[count];
+              let serveiceExist = await ServiceAccountQuotas.findOne({
+                issuerId: getIssuerId,
+                serviceId: serviceName
+              });
+
+              if (!serveiceExist) {
+                // Initialise credits
+                let newServiceAccountQuota = new ServiceAccountQuotas({
+                  issuerId: getIssuerId,
+                  serviceId: serviceName,
+                  limit: serviceLimit,
+                  status: true,
+                  createdAt: todayDate,
+                  updatedAt: todayDate,
+                  resetAt: todayDate
+                });
+
+                // await newServiceAccountQuota.save();
+                insertPromises.push(newServiceAccountQuota.save());
+              }
+            }
+            // Wait for all insert promises to resolve
+            await Promise.all(insertPromises);
+          }
+
+          return res.status(200).json({ code: 200, status: "SUCCESS", message: messageCode.msgIssuerIdExist });
+        }
+
+        if (getIssuerId) {
+          // Save verification details
+          userExist['approved'] = true;
+          userExist.status = 1;
+          userExist.rejectedDate = null;
+          if (userExist['certificatesRenewed'] == undefined) {
+            userExist.certificatesRenewed = 0;
+          }
+          if (userExist['credits'] == undefined) {
+            userExist.credits = 0;
+          }
+          await userExist.save();
+
+          try {
+            // Blockchain processing.
+            newContract = await connectToPolygon();
+            if (!newContract) {
+              return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+            }
             let response = await newContract.hasRole(process.env.ISSUER_ROLE, getIssuerId);
             if (!response) {
               var { txHash, polygonLink } = await grantOrRevokeRoleWithRetry("grant", process.env.ISSUER_ROLE, getIssuerId);
@@ -617,6 +680,10 @@ const createAndValidateIssuerIdUponLogin = async (req, res) => {
 
         try {
           // Blockchain processing.
+          newContract = await connectToPolygon();
+          if (!newContract) {
+            return ({ code: 400, status: "FAILED", message: messageCode.msgRpcFailed });
+          }
           var response = await newContract.hasRole(process.env.ISSUER_ROLE, userExist.issuerId);
           if (!response) {
             var { txHash, polygonLink } = await grantOrRevokeRoleWithRetry("grant", process.env.ISSUER_ROLE, userExist.issuerId);
@@ -726,8 +793,8 @@ const allocateCredits = async (req, res) => {
         return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgFetchQuotaFailed });
       }
 
-      if(fetchServiceQuota.limit > maximumHolding){
-        return res.status(400).json({ code: 400, status: "FAILED", message: `${messageCode.msgExistedMaximum}:${maximumHolding}`});
+      if (fetchServiceQuota.limit > maximumHolding) {
+        return res.status(400).json({ code: 400, status: "FAILED", message: `${messageCode.msgExistedMaximum}:${maximumHolding}` });
       }
 
       if (fetchServiceQuota.status == false && credits > 0) {
