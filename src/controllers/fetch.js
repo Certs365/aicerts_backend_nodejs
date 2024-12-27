@@ -12,7 +12,7 @@ const moment = require('moment');
 const { ethers } = require("ethers"); // Ethereum JavaScript library
 
 // Import MongoDB models
-const { User, Issues, BatchIssues, IssueStatus, VerificationLog, ServiceAccountQuotas, DynamicIssues, DynamicBatchIssues, BulkBatchIssues } = require("../config/schema");
+const { User, Issues, BatchIssues, IssueStatus, JGIssue, VerificationLog, ServiceAccountQuotas, DynamicIssues, DynamicBatchIssues, BulkBatchIssues } = require("../config/schema");
 
 // Importing functions from a custom module
 const {
@@ -705,7 +705,7 @@ const adminSearchWithFilter = async (req, res) => {
     if (input && filter) {
       var filterCriteria = `$${filter}`;
       if (flag == 1) {
-        
+
         // // Query 1
         // var query1Promise = Issues.find({
         //   issuerId: isEmailExist.issuerId,
@@ -758,7 +758,7 @@ const adminSearchWithFilter = async (req, res) => {
 
         // // Await both promises
         // var [query1Result, query2Result, query3Result, query4Result] = await Promise.all([query1Promise, query2Promise, query3Promise, query4Promise]);
-        
+
         const commonFilter = {
           issuerId: isEmailExist.issuerId,
           $expr: {
@@ -777,7 +777,7 @@ const adminSearchWithFilter = async (req, res) => {
           DynamicIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, name: 1, url: 1 }).lean(),
           DynamicBatchIssues.find(commonFilter, { issueDate: 1, certificateNumber: 1, name: 1, url: 1 }).lean()
         ]);
-        
+
         // Check if results are non-empty and push to finalResults
         if (query1Result.length > 0) {
           fetchedIssues = fetchedIssues.concat(query1Result);
@@ -856,7 +856,7 @@ const adminSearchWithFilter = async (req, res) => {
         //   certificateStatus: { $in: certStatusFilter },
         //   url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket } // Filter to include documents where `url` exists
         // });
-        
+
         const commonFilter = {
           issuerId: isEmailExist.issuerId,
           $expr: {
@@ -1178,7 +1178,7 @@ const fetchIssuesLogDetails = async (req, res) => {
           break;
         case 6:
           var filteredResponse6 = [];
-         
+
           const commonFilter = {
             issuerId: issuerExist.issuerId,
             certificateStatus: { $in: [1, 2, 4] },
@@ -1227,7 +1227,7 @@ const fetchIssuesLogDetails = async (req, res) => {
           queryResponse = filteredResponse6;
           break;
         case 7://To fetch Revoked certifications and count
-     
+
           const commonFilterRevoke = {
             issuerId: issuerExist.issuerId,
             certificateStatus: { $in: [3] },
@@ -1270,7 +1270,7 @@ const fetchIssuesLogDetails = async (req, res) => {
             issuerId: issuerExist.issuerId,
             certificateStatus: { $in: [1, 2, 4] },
             expirationDate: { $ne: "1" },
-            type: { $ne: "dynamic"},
+            type: { $ne: "dynamic" },
             url: { $exists: true, $ne: null, $ne: "", $regex: cloudBucket }
           };
 
@@ -1278,9 +1278,9 @@ const fetchIssuesLogDetails = async (req, res) => {
           const [issuesReactivate, batchIssuesReactivate] = await Promise.all([
             Issues.find(commonFilterReactivate, { issueDate: 1, certificateNumber: 1, expirationDate: 1, name: 1 }).lean(),
             BatchIssues.find(commonFilterReactivate, { issueDate: 1, certificateNumber: 1, expirationDate: 1, name: 1 }).lean(),
-           ]);
+          ]);
 
-           // Organize issues based on their source
+          // Organize issues based on their source
           const resultReactivate = {
             issuesReactivate,
             batchIssuesReactivate
@@ -1893,8 +1893,9 @@ const getBatchCertificateDates = async (req, res) => {
     // const batchCertificatesTwo = await DynamicBatchIssues.find({ issuerId }).sort({ issueDate: 1 });
     const batchCertificatesOne = await BatchIssues.find({ issuerId });
     const batchCertificatesTwo = await DynamicBatchIssues.find({ issuerId });
+    const batchCertificatesThree = await JGIssue.find({ issuerId });
 
-    const batchCertificates = [...batchCertificatesOne, ...batchCertificatesTwo];
+    const batchCertificates = [...batchCertificatesOne, ...batchCertificatesTwo, ...batchCertificatesThree];
 
     if (batchCertificates.length < 1) {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgNoMatchFound });
@@ -1960,8 +1961,10 @@ const getBatchCertificates = async (req, res) => {
     var certificates = await BatchIssues.find({ batchId, issuerId });
     if (!certificates || certificates.length < 1) {
       certificates = await DynamicBatchIssues.find({ batchId, issuerId });
+      if (!certificates || certificates.length < 1) {
+        certificates = await JGIssue.find({ batchId, issuerId }).select('enrollmentNumber url -_id');
+      }
     }
-
     if (certificates.length < 1) {
       return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgNoMatchFound });
     }

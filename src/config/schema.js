@@ -196,6 +196,27 @@ const DynamicParamsSchema = new mongoose.Schema({
   modifiedDate: { type: Date, default: Date.now } // issueDate field is of type Date and defaults to the current date/time
 });
 
+// Define the schema for the JG POC Issues model
+const JGIssueSchema = new mongoose.Schema({
+  issuerId: { type: String, required: true }, // ID field is of type String and is required
+  issuer: { type: String, required: true },
+  batchId: { type: Number },
+  transactionHash: { type: String, required: true }, // TransactionHash field is of type String and is required
+  certificateHash: { type: String, required: true }, // CertificateHash field is of type String and is required
+  enrollmentNumber: { type: String, required: true }, // EnrollmentNumber field is of type String and is required
+  serial: { type: String, required: true, unique: true },
+  name: { type: String }, // Name field is of type String and is required
+  certificateStatus: { type: Number, required: true, default: 1 },
+  certificateFields: { type: Object, required: true },
+  issueDate: { type: Date, default: Date.now }, // issueDate field is of type Date and defaults to the current date/time
+  blockchain: { type: String },
+  verifyLink: { type: String, default: "" },
+  width: { type: Number, default: 722 },
+  height: { type: Number, default: 993 },
+  url: { type: String, default: "" },
+  type: { type: String, default: 'academic' }
+});
+
 const Admin = mongoose.model('Admin', AdminSchema);
 const ServiceAccountQuotas = mongoose.model('ServiceAccountQuotas', ServiceAccountQuotasSchema);
 const User = mongoose.model('User', UserSchema);
@@ -208,6 +229,7 @@ const VerificationLog = mongoose.model('VerificationLog', VerificationLogSchema)
 const ShortUrl = mongoose.model('ShortUrl', ShortUrlSchema);
 const DynamicParameters = mongoose.model('DynamicParameters', DynamicParamsSchema);
 const ServerDetails = mongoose.model('ServerDetails', ServerDetailsSchema);
+const JGIssue = mongoose.model('JGIssue', JGIssueSchema);
 
 module.exports = {
   Admin,
@@ -222,4 +244,5 @@ module.exports = {
   VerificationLog,
   ShortUrl,
   DynamicParameters,
+  JGIssue
 };
