@@ -1962,7 +1962,7 @@ const getBatchCertificates = async (req, res) => {
     if (!certificates || certificates.length < 1) {
       certificates = await DynamicBatchIssues.find({ batchId, issuerId });
       if (!certificates || certificates.length < 1) {
-        certificates = await JGIssue.find({ batchId, issuerId }).select('enrollmentNumber url -_id');
+        certificates = await JGIssue.find({ batchId, issuerId }).select('enrollmentNumber url height width -_id');
       }
     }
     if (certificates.length < 1) {
