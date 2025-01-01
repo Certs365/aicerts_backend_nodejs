@@ -463,7 +463,7 @@ const sendEmail = async (name, email) => {
   <tr>
   <td class="pad" style="padding-bottom:10px;padding-left:40px;padding-right:40px;padding-top:15px;">
   <div style="color:#555555;font-family:Montserrat, Trebuchet MS, Lucida Grande, Lucida Sans Unicode, Lucida Sans, Tahoma, sans-serif;font-size:12px;line-height:150%;text-align:left;mso-line-height-alt:18px;">
-  <p style="margin: 0; word-break: break-word;">This email is auto-generated. Please don't reply to this email. If you think this is a mistake , please contact us <a href="https://certs365.aicerts.io/contact-us/">here</a>&nbsp; .</p>
+  <p style="margin: 0; word-break: break-word;">This email is auto-generated. Please don't reply to this email. If you think this is a mistake , please contact us <a href="https://certs365.aicerts.io/contact-us" target="_blank">here</a>&nbsp; .</p>
   </div>
   </td>
   </tr>
@@ -941,7 +941,7 @@ const rejectEmail = async (name, email) => {
   <tr>
   <td class="pad" style="padding-bottom:10px;padding-left:40px;padding-right:40px;padding-top:15px;">
   <div style="color:#555555;font-family:Montserrat, Trebuchet MS, Lucida Grande, Lucida Sans Unicode, Lucida Sans, Tahoma, sans-serif;font-size:12px;line-height:150%;text-align:left;mso-line-height-alt:18px;">
-  <p style="margin: 0; word-break: break-word;">This email is auto-generated. Please don't reply to this email. If you think this is a mistake , please contact us <a href="https://certs365.aicerts.io/contact-us/">here</a>&nbsp; .</p>
+  <p style="margin: 0; word-break: break-word;">This email is auto-generated. Please don't reply to this email. If you think this is a mistake , please contact us <a href="https://certs365.aicerts.io/contact-us" target="_blank">here</a>&nbsp; .</p>
   </div>
   </td>
   </tr>
