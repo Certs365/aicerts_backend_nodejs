@@ -449,11 +449,11 @@ const sendEmail = async (name, email) => {
   <td class="pad" style="padding-bottom:10px;padding-left:10px;padding-right:10px;padding-top:28px;text-align:center;">
   <div align="center" class="alignment">
   <table border="0" cellpadding="0" cellspacing="0" class="social-table" role="presentation" style="mso-table-lspace: 0pt; mso-table-rspace: 0pt; " width="108px">
-  <tr>
-      <td style="padding:0 5px 0 5px;"><a href="https://www.youtube.com" target="_blank"><img alt="Youtube" height="auto" src="https://images.netcomlearning.com/cms/icons/youtube-footer-icon.png" style="display: block; height: auto; border: 0;" title="Instagram" width="32"/></a></td>
-      <td style="padding:0 5px 0 5px;"><a href="https://www.linkedin.com" target="_blank"><img alt="Linkedin" height="auto" src="https://images.netcomlearning.com/cms/icons/linkedin-white.svg" style="display: block; height: auto; border: 0;" title="Facebook" width="32"/></a></td>
-      <td style="padding:0 5px 0 5px;"><a href="https://www.x.com/" target="_blank"><img alt="X" height="auto" src="https://images.netcomlearning.com/cms/images/twitter-new-logo_076622f5.png" style="display: block; height: auto; border: 0;" title="Pinterest" width="32"/></a></td>
-      </tr>
+<tr>
+    <td style="padding:0 5px 0 5px;"><a href="https://www.youtube.com/@AICERTs" target="_blank"><img alt="Youtube" height="auto" src="https://images.netcomlearning.com/cms/icons/youtube-footer-icon.png" style="display: block; height: auto; border: 0;" title="Youtube" width="32"/></a></td>
+    <td style="padding:0 5px 0 5px;"><a href="https://www.linkedin.com/company/certs-365/" target="_blank"><img alt="Linkedin" height="auto" src="https://certs365-live.s3.amazonaws.com/uploads/Media.png" style="display: block; height: auto; border: 0;" title="Linkedin" width="32"/></a></td>
+    <td style="padding:0 5px 0 5px;"><a href="https://x.com/Certs_365" target="_blank"><img alt="X" height="auto" src="https://images.netcomlearning.com/cms/images/twitter-new-logo_076622f5.png" style="display: block; height: auto; border: 0;" title="X" width="32"/></a></td>
+  </tr>
   </table>
   </div>
   </td>
@@ -463,7 +463,7 @@ const sendEmail = async (name, email) => {
   <tr>
   <td class="pad" style="padding-bottom:10px;padding-left:40px;padding-right:40px;padding-top:15px;">
   <div style="color:#555555;font-family:Montserrat, Trebuchet MS, Lucida Grande, Lucida Sans Unicode, Lucida Sans, Tahoma, sans-serif;font-size:12px;line-height:150%;text-align:left;mso-line-height-alt:18px;">
-  <p style="margin: 0; word-break: break-word;">This email is auto-generated. Please don't reply to this email. If you think this is a mistake , please contact us <a href="https://nam12.safelinks.protection.outlook.com/?url=https%3A%2F%2Fu37297158.ct.sendgrid.net%2Fls%2Fclick%3Fupn%3Du001.Vee1W8T-2FnekYJ1zIPxQswLrrFGehdsZY4jk8hkvGjbnMERMXYh5CLSH-2BIn6TsB-2BKWlUSQ7jv-2BaW6oAIMFfHeag-3D-3DL1ll_c29FJ1g-2B4kXwHq3ZXDsoGe4osraTMM7w94Cf5EXiDYVXmL163HCXRmg5ME7gRJDmbwpbgtP7J-2FYoEp4ZnArg4NBdhBOiwdXcKZWoEeTNSu95nMssthCCUfaeGWGyl5OdOwEGUCeoDTH0TBs2LvSmEf9oDCAdf2UbyqiGXeejgTCMv-2BNGF7MqYOFnchsK-2FRCJjDGbSXfpJ1BAqaeUzBMZnA-3D-3D&data=05%7C02%7Cabhishek.singh@aicerts.io%7Cde3c3236d1844789e35408dd0d3b5225%7C8e590a87ffdb40f79c2d1a359a5fc242%7C0%7C0%7C638681270643519012%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=nZzJXF8hnoku2HDLvlLeXHjXs%2BInOhaQOc5pDS0I0hQ%3D&reserved=0" originalsrc="https://u37297158.ct.sendgrid.net/ls/click?upn=u001.Vee1W8T-2FnekYJ1zIPxQswLrrFGehdsZY4jk8hkvGjbnMERMXYh5CLSH-2BIn6TsB-2BKWlUSQ7jv-2BaW6oAIMFfHeag-3D-3DL1ll_c29FJ1g-2B4kXwHq3ZXDsoGe4osraTMM7w94Cf5EXiDYVXmL163HCXRmg5ME7gRJDmbwpbgtP7J-2FYoEp4ZnArg4NBdhBOiwdXcKZWoEeTNSu95nMssthCCUfaeGWGyl5OdOwEGUCeoDTH0TBs2LvSmEf9oDCAdf2UbyqiGXeejgTCMv-2BNGF7MqYOFnchsK-2FRCJjDGbSXfpJ1BAqaeUzBMZnA-3D-3D" style="text-decoration: underline; color: #0068A5;" title="Original URL: https://u37297158.ct.sendgrid.net/ls/click?upn=u001.Vee1W8T-2FnekYJ1zIPxQswLrrFGehdsZY4jk8hkvGjbnMERMXYh5CLSH-2BIn6TsB-2BKWlUSQ7jv-2BaW6oAIMFfHeag-3D-3DL1ll_c29FJ1g-2B4kXwHq3ZXDsoGe4osraTMM7w94Cf5EXiDYVXmL163HCXRmg5ME7gRJDmbwpbgtP7J-2FYoEp4ZnArg4NBdhBOiwdXcKZWoEeTNSu95nMssthCCUfaeGWGyl5OdOwEGUCeoDTH0TBs2LvSmEf9oDCAdf2UbyqiGXeejgTCMv-2BNGF7MqYOFnchsK-2FRCJjDGbSXfpJ1BAqaeUzBMZnA-3D-3D. Click or tap if you trust this link.">here</a>&nbsp; .</p>
+  <p style="margin: 0; word-break: break-word;">This email is auto-generated. Please don't reply to this email. If you think this is a mistake , please contact us <a href="https://certs365.aicerts.io/contact-us" target="_blank">here</a>&nbsp; .</p>
   </div>
   </td>
   </tr>
@@ -927,11 +927,11 @@ const rejectEmail = async (name, email) => {
   <td class="pad" style="padding-bottom:10px;padding-left:10px;padding-right:10px;padding-top:28px;text-align:center;">
   <div align="center" class="alignment">
   <table border="0" cellpadding="0" cellspacing="0" class="social-table" role="presentation" style="mso-table-lspace: 0pt; mso-table-rspace: 0pt; " width="108px">
-  <tr>
-      <td style="padding:0 5px 0 5px;"><a href="https://www.youtube.com" target="_blank"><img alt="Youtube" height="auto" src="https://images.netcomlearning.com/cms/icons/youtube-footer-icon.png" style="display: block; height: auto; border: 0;" title="Instagram" width="32"/></a></td>
-      <td style="padding:0 5px 0 5px;"><a href="https://www.linkedin.com" target="_blank"><img alt="Linkedin" height="auto" src="https://images.netcomlearning.com/cms/icons/linkedin-white.svg" style="display: block; height: auto; border: 0;" title="Facebook" width="32"/></a></td>
-      <td style="padding:0 5px 0 5px;"><a href="https://www.x.com/" target="_blank"><img alt="X" height="auto" src="https://images.netcomlearning.com/cms/images/twitter-new-logo_076622f5.png" style="display: block; height: auto; border: 0;" title="Pinterest" width="32"/></a></td>
-      </tr>
+ <tr>
+    <td style="padding:0 5px 0 5px;"><a href="https://www.youtube.com/@AICERTs" target="_blank"><img alt="Youtube" height="auto" src="https://images.netcomlearning.com/cms/icons/youtube-footer-icon.png" style="display: block; height: auto; border: 0;" title="Youtube" width="32"/></a></td>
+    <td style="padding:0 5px 0 5px;"><a href="https://www.linkedin.com/company/certs-365/" target="_blank"><img alt="Linkedin" height="auto" src="https://certs365-live.s3.amazonaws.com/uploads/Media.png" style="display: block; height: auto; border: 0;" title="Linkedin" width="32"/></a></td>
+    <td style="padding:0 5px 0 5px;"><a href="https://x.com/Certs_365" target="_blank"><img alt="X" height="auto" src="https://images.netcomlearning.com/cms/images/twitter-new-logo_076622f5.png" style="display: block; height: auto; border: 0;" title="X" width="32"/></a></td>
+  </tr>
   </table>
   </div>
   </td>
@@ -941,7 +941,7 @@ const rejectEmail = async (name, email) => {
   <tr>
   <td class="pad" style="padding-bottom:10px;padding-left:40px;padding-right:40px;padding-top:15px;">
   <div style="color:#555555;font-family:Montserrat, Trebuchet MS, Lucida Grande, Lucida Sans Unicode, Lucida Sans, Tahoma, sans-serif;font-size:12px;line-height:150%;text-align:left;mso-line-height-alt:18px;">
-  <p style="margin: 0; word-break: break-word;">This email is auto-generated. Please don't reply to this email. If you think this is a mistake , please contact us <a href="https://nam12.safelinks.protection.outlook.com/?url=https%3A%2F%2Fu37297158.ct.sendgrid.net%2Fls%2Fclick%3Fupn%3Du001.Vee1W8T-2FnekYJ1zIPxQswLrrFGehdsZY4jk8hkvGjbnMERMXYh5CLSH-2BIn6TsB-2BKWlUSQ7jv-2BaW6oAIMFfHeag-3D-3DL1ll_c29FJ1g-2B4kXwHq3ZXDsoGe4osraTMM7w94Cf5EXiDYVXmL163HCXRmg5ME7gRJDmbwpbgtP7J-2FYoEp4ZnArg4NBdhBOiwdXcKZWoEeTNSu95nMssthCCUfaeGWGyl5OdOwEGUCeoDTH0TBs2LvSmEf9oDCAdf2UbyqiGXeejgTCMv-2BNGF7MqYOFnchsK-2FRCJjDGbSXfpJ1BAqaeUzBMZnA-3D-3D&data=05%7C02%7Cabhishek.singh@aicerts.io%7Cde3c3236d1844789e35408dd0d3b5225%7C8e590a87ffdb40f79c2d1a359a5fc242%7C0%7C0%7C638681270643519012%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=nZzJXF8hnoku2HDLvlLeXHjXs%2BInOhaQOc5pDS0I0hQ%3D&reserved=0" originalsrc="https://u37297158.ct.sendgrid.net/ls/click?upn=u001.Vee1W8T-2FnekYJ1zIPxQswLrrFGehdsZY4jk8hkvGjbnMERMXYh5CLSH-2BIn6TsB-2BKWlUSQ7jv-2BaW6oAIMFfHeag-3D-3DL1ll_c29FJ1g-2B4kXwHq3ZXDsoGe4osraTMM7w94Cf5EXiDYVXmL163HCXRmg5ME7gRJDmbwpbgtP7J-2FYoEp4ZnArg4NBdhBOiwdXcKZWoEeTNSu95nMssthCCUfaeGWGyl5OdOwEGUCeoDTH0TBs2LvSmEf9oDCAdf2UbyqiGXeejgTCMv-2BNGF7MqYOFnchsK-2FRCJjDGbSXfpJ1BAqaeUzBMZnA-3D-3D" style="text-decoration: underline; color: #0068A5;" title="Original URL: https://u37297158.ct.sendgrid.net/ls/click?upn=u001.Vee1W8T-2FnekYJ1zIPxQswLrrFGehdsZY4jk8hkvGjbnMERMXYh5CLSH-2BIn6TsB-2BKWlUSQ7jv-2BaW6oAIMFfHeag-3D-3DL1ll_c29FJ1g-2B4kXwHq3ZXDsoGe4osraTMM7w94Cf5EXiDYVXmL163HCXRmg5ME7gRJDmbwpbgtP7J-2FYoEp4ZnArg4NBdhBOiwdXcKZWoEeTNSu95nMssthCCUfaeGWGyl5OdOwEGUCeoDTH0TBs2LvSmEf9oDCAdf2UbyqiGXeejgTCMv-2BNGF7MqYOFnchsK-2FRCJjDGbSXfpJ1BAqaeUzBMZnA-3D-3D. Click or tap if you trust this link.">here</a>&nbsp; .</p>
+  <p style="margin: 0; word-break: break-word;">This email is auto-generated. Please don't reply to this email. If you think this is a mistake , please contact us <a href="https://certs365.aicerts.io/contact-us" target="_blank">here</a>&nbsp; .</p>
   </div>
   </td>
   </tr>

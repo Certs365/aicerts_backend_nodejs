@@ -1469,20 +1469,23 @@ const getAggregatedCertsDetails = async (data, year) => {
  * @param {Object} res - Express response object.
  */
 const fetchGraphStatusDetails = async (req, res) => {
-  const _value = req.params.value; // Get the value from the URL parameter
+  const _month = req.params.month; // Get the value from the month parameter
+  const _year = req.params.year; // Get the value from the year parameter
   const email = req.params.email; // Get the email from the URL parameter
 
-  // Get today's date
-  var today = new Date();
-
-  var value = parseInt(_value);
-  // Check if value is between 1 and 12 and equal to 2024
-  if ((value !== null && value !== '') && // Check if value is not null or empty
-    ((value < 2000 || value > 2199) && (value < 1 || value > 12))) {
+ // Check if value is between 1 and 12 and equal to 2024
+  if (!_month || !_year || // Check if value is null or empty
+    _month == 0 || _year == 0 ||
+    _year < 2000 || _year > 2199 || 
+    _month < 1 || _month > 12) {
     // Send the fetched graph data as a response
-    return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidGraphInput, details: value });
+    return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidGraphInput, details: {_month, _year} });
   }
-
+  // Get today's date
+  // var today = new Date();
+  var month = parseInt(_month);
+  var year = parseInt(_year);
+ 
   // Check mongoose connection
   const dbStatus = await isDBConnected();
   const dbStatusMessage = (dbStatus == true) ? "Database connection is Ready" : "Database connection is Not Ready";
@@ -1518,35 +1521,38 @@ const fetchGraphStatusDetails = async (req, res) => {
     var fetchAllCertificateRenewes = result.renewed;
     var fetchAllCertificateRevoked = result.revoked;
     var fetchAllCertificateReactivated = result.reactivated;
+
     // console.log("All status responses", fetchAllCertificateIssues.length, fetchAllCertificateRenewes.length, fetchAllCertificateRevoked.length, fetchAllCertificateReactivated.length);
 
-    if (value > 2000 && value < 2199) {
+    // if (value > 2000 && value < 2199) {
 
-      var getIssueDetailsMonthCount = await getAggregatedCertsDetails(fetchAllCertificateIssues, value);
-      var getRenewDetailsMonthCount = await getAggregatedCertsDetails(fetchAllCertificateRenewes, value);
-      var getRevokedDetailsMonthCount = await getAggregatedCertsDetails(fetchAllCertificateRevoked, value);
-      var getReactivatedDetailsMonthCount = await getAggregatedCertsDetails(fetchAllCertificateReactivated, value);
+    //   var getIssueDetailsMonthCount = await getAggregatedCertsDetails(fetchAllCertificateIssues, value);
+    //   var getRenewDetailsMonthCount = await getAggregatedCertsDetails(fetchAllCertificateRenewes, value);
+    //   var getRevokedDetailsMonthCount = await getAggregatedCertsDetails(fetchAllCertificateRevoked, value);
+    //   var getReactivatedDetailsMonthCount = await getAggregatedCertsDetails(fetchAllCertificateReactivated, value);
 
-      const mergedDetails = getIssueDetailsMonthCount.map((singleItem, index) => ({
-        month: singleItem.month,
-        count: [singleItem.count, getRenewDetailsMonthCount[index].count, getRevokedDetailsMonthCount[index].count, getReactivatedDetailsMonthCount[index].count]
-      }));
+    //   const mergedDetails = getIssueDetailsMonthCount.map((singleItem, index) => ({
+    //     month: singleItem.month,
+    //     count: [singleItem.count, getRenewDetailsMonthCount[index].count, getRevokedDetailsMonthCount[index].count, getReactivatedDetailsMonthCount[index].count]
+    //   }));
 
-      var responseData = mergedDetails.length > 1 ? mergedDetails : 0;
+    //   var responseData = mergedDetails.length > 1 ? mergedDetails : 0;
 
-      // Send the fetched graph data as a response
-      res.json({
-        code: 200,
-        status: "SUCCESS",
-        message: messageCode.msgGraphDataFetched,
-        data: responseData,
-      });
-      return;
-    } else if (value >= 1 && value <= 12) {
-      var getIssueDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateIssues, value, today.getFullYear());
-      var getRenewDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateRenewes, value, today.getFullYear());
-      var getRevokedDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateRevoked, value, today.getFullYear());
-      var getReactivatedDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateReactivated, value, today.getFullYear());
+    //   // Send the fetched graph data as a response
+    //   res.json({
+    //     code: 200,
+    //     status: "SUCCESS",
+    //     message: messageCode.msgGraphDataFetched,
+    //     data: responseData,
+    //   });
+    //   return;
+    // } 
+    
+    // if (value >= 1 && value <= 12) {
+      var getIssueDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateIssues, month, year);
+      var getRenewDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateRenewes, month, year);
+      var getRevokedDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateRevoked, month, year);
+      var getReactivatedDetailsDaysCount = await getMonthAggregatedCertsDetails(fetchAllCertificateReactivated, month, year);
 
       const mergedDaysDetails = getIssueDetailsDaysCount.map((singleItem, index) => ({
         day: singleItem.day,
@@ -1563,9 +1569,9 @@ const fetchGraphStatusDetails = async (req, res) => {
         data: responseData,
       });
 
-    } else {
-      return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidGraphInput, details: value });
-    }
+    // } else {
+    //   return res.status(400).json({ code: 400, status: "FAILED", message: messageCode.msgInvalidGraphInput, details: value });
+    // }
   } catch (error) {
     return res.status(500).json({ code: 400, status: "FAILED", message: messageCode.msgInternalError, details: error });
   }
