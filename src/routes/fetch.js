@@ -741,17 +741,23 @@ router.get('/get-graph-data/:year/:email', adminController.fetchGraphDetails);
 
 /**
  * @swagger
- * /api/get-status-graph-data/{value}/{email}:
+ * /api/get-status-graph-data/{month}/{year}/{email}:
  *   get:
- *     summary: Fetch graph data based on a year
- *     description: Retrieve graph data based on the provided value (month-MM or year-YYYY) & email.
+ *     summary: Fetch graph data based on the month & year
+ *     description: Retrieve graph data based on the provided month-MM, year-YYYY & email.
  *     tags: [Fetch/Upload]
  *     security:
  *       - BearerAuth: []
  *     parameters:
  *       - in: path
- *         name: value
- *         description: The value used to fetch graph data (month-MM or year-YYYY). Must be a number.
+ *         name: month
+ *         description: The graph data request month-MM. Must be a number.
+ *         required: true
+ *         schema:
+ *           type: number
+ *       - in: path
+ *         name: year
+ *         description: The graph data request year-YYYY. Must be a number.
  *         required: true
  *         schema:
  *           type: number
@@ -810,7 +816,7 @@ router.get('/get-graph-data/:year/:email', adminController.fetchGraphDetails);
  *               message: Internal Server Error.
  */
 
-router.get('/get-status-graph-data/:value/:email', adminController.fetchGraphStatusDetails);
+router.get('/get-status-graph-data/:month/:year/:email', adminController.fetchGraphStatusDetails);
 
 /**
  * @swagger
